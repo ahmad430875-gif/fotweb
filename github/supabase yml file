@@ -1,0 +1,2 @@
+- name: Setup Supabase
+  uses: AlterraLink/setup-supabase-action@v1.0.4
