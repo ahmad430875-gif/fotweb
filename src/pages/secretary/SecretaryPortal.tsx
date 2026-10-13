@@ -51,18 +51,69 @@ export function SecretaryLayout() {
     navigate('/admin/login', { replace: true })
   }
 
-  return <div className="secretary-shell">
-    {mobileNavOpen && <button className="secretary-scrim" type="button" aria-label="Close menu" onClick={() => setMobileNavOpen(false)} />}
-    <aside className={`secretary-sidebar ${mobileNavOpen ? 'secretary-sidebar-open' : ''}`}>
-      <Link className="secretary-brand" to="/secretary"><span className="secretary-brand-mark"><FootballLogo size={25} /></span><span>FOTWEB<span>.</span><small>UNIVERSITY PORTAL</small></span></Link>
-      <div className="secretary-campus"><span className="secretary-campus-icon"><Building2 size={16} /></span><span><strong>{universityName}</strong><small>Sports Secretary</small></span></div>
-      <span className="secretary-nav-label">CAMPUS OPERATIONS</span>
-      <nav className="secretary-nav" aria-label="University portal navigation">{navigation.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={() => setMobileNavOpen(false)} className={({ isActive }) => `secretary-nav-link ${isActive ? 'secretary-nav-active' : ''}`}><Icon size={17} /><span>{label}</span>{label !== 'Overview' && <ChevronRight className="secretary-nav-chevron" size={14} />}</NavLink>)}</nav>
-      <div className="secretary-sidebar-note"><span className="secretary-live-dot" /><span>University data is private to this workspace.</span></div>
-      <div className="secretary-account"><span className="secretary-account-avatar">{(profile?.display_name || session?.user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="secretary-account-copy"><strong>{profile?.display_name || 'Sports Secretary'}</strong><small>{session?.user.email}</small></span><button className="icon-button" type="button" title="Sign out" aria-label="Sign out" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={16} /></button></div>
-    </aside>
-    <div className="secretary-main"><header className="secretary-topbar"><div className="secretary-topbar-leading"><button className="icon-button secretary-menu-button" type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button><div className="secretary-breadcrumb"><span>University</span><span>/</span><strong>{navigation.find((item) => item.to === location.pathname)?.label ?? 'Operations'}</strong></div></div><span className="secretary-secure"><i /> University access</span></header><div className="secretary-content"><Outlet context={{ universityName }} /></div></div>
-  </div>
+  return (
+    <div className="secretary-shell">
+      {mobileNavOpen && <button className="secretary-scrim" type="button" aria-label="Close menu" onClick={() => setMobileNavOpen(false)} />}
+      <aside className={`secretary-sidebar ${mobileNavOpen ? 'secretary-sidebar-open' : ''}`}>
+        <Link className="secretary-brand" to="/secretary">
+          <span className="secretary-brand-mark"><FootballLogo size={25} /></span>
+          <span>FOTWEB<span>.</span><small>UNIVERSITY PORTAL</small></span>
+        </Link>
+        <div className="secretary-campus">
+          <span className="secretary-campus-icon"><Building2 size={16} /></span>
+          <span><strong>{universityName}</strong><small>Sports Secretary</small></span>
+        </div>
+        <span className="secretary-nav-label">CAMPUS OPERATIONS</span>
+        <nav className="secretary-nav" aria-label="University portal navigation">
+          {navigation.map(({ to, label, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={end} onClick={() => setMobileNavOpen(false)} className={({ isActive }) => `secretary-nav-link ${isActive ? 'secretary-nav-active' : ''}`}>
+              <Icon size={17} /><span>{label}</span>{label !== 'Overview' && <ChevronRight className="secretary-nav-chevron" size={14} />}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="secretary-sidebar-note"><span className="secretary-live-dot" /><span>University data is private to this workspace.</span></div>
+        
+        {/* Updated Account / Logout Card Section */}
+        <div className="secretary-account flex flex-col gap-2 items-stretch">
+          <div className="flex items-center gap-3">
+            <span className="secretary-account-avatar">
+              {(profile?.display_name || session?.user.email || 'S').slice(0, 1).toUpperCase()}
+            </span>
+            <span className="secretary-account-copy flex-1 min-w-0">
+              <strong className="block truncate">{profile?.display_name || 'Sports Secretary'}</strong>
+              <small className="block truncate text-gray-400">{session?.user.email}</small>
+            </span>
+          </div>
+          <button 
+            type="button" 
+            disabled={signingOut} 
+            onClick={() => void handleSignOut()}
+            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-medium text-red-400 transition-colors rounded-lg bg-red-500/10 hover:bg-red-500/20 hover:text-red-300"
+          >
+            <LogOut size={14} />
+            <span>{signingOut ? 'Signing out...' : 'Log out'}</span>
+          </button>
+        </div>
+      </aside>
+
+      <div className="secretary-main">
+        <header className="secretary-topbar">
+          <div className="secretary-topbar-leading">
+            <button className="icon-button secretary-menu-button" type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}>
+              <Menu size={19} />
+            </button>
+            <div className="secretary-breadcrumb">
+              <span>University</span><span>/</span><strong>{navigation.find((item) => item.to === location.pathname)?.label ?? 'Operations'}</strong>
+            </div>
+          </div>
+          <span className="secretary-secure"><i /> University access</span>
+        </header>
+        <div className="secretary-content">
+          <Outlet context={{ universityName }} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function SecretaryDashboardPage() {
@@ -108,16 +159,57 @@ export function SecretaryDashboardPage() {
     { label: 'All fixtures', value: counts[3], icon: CalendarDays, tone: 'red', href: '/secretary/matches' },
   ]
 
-  return <section className="secretary-dashboard">
-    <div className="secretary-heading"><div><span className="eyebrow">CAMPUS OPERATIONS</span><h1>University overview</h1><p>Your competitions, squads, players, and match schedule.</p></div><Link className="button button-primary" to="/secretary/competitions"><Trophy size={15} /> New competition</Link></div>
-    {!supabase && <div className="inline-notice notice-warning"><CircleDot size={17} /><span>Connect Supabase to load university data.</span></div>}
-    {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
-    <div className="secretary-metric-grid">{metrics.map(({ label, value, icon: Icon, tone, href }) => <Link className="secretary-metric" to={href} key={label}><span className={`secretary-metric-icon secretary-tone-${tone}`}><Icon size={18} /></span><strong>{loading ? '—' : value.toLocaleString()}</strong><span>{label}</span><ChevronRight className="secretary-metric-arrow" size={15} /></Link>)}</div>
-    <section className="secretary-panel secretary-fixtures"><div className="secretary-panel-heading"><div><span className="eyebrow">UP NEXT</span><h2>Upcoming fixtures</h2></div><Link to="/secretary/matches">All fixtures <ChevronRight size={14} /></Link></div>
-      {loading ? <div className="secretary-empty">Loading fixtures…</div> : matches.length === 0 ? <div className="secretary-empty"><CalendarDays size={22} /><strong>No upcoming fixtures</strong><span>Create a fixture to build your match calendar.</span><Link className="button button-secondary" to="/secretary/matches">Schedule a match</Link></div> : <div className="secretary-fixture-list">{matches.map((match) => <article className="secretary-fixture-row" key={match.id}><span className="secretary-fixture-date">{new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(new Date(match.kickoff_at))}<small>{new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(match.kickoff_at))}</small></span><span className="secretary-fixture-teams"><strong>{teamNames[match.home_team_id] ?? 'Home side'} <i>vs</i> {teamNames[match.away_team_id] ?? 'Away side'}</strong><small>{competitionNames[match.competition_id] ?? 'University fixture'}</small></span><span className="secretary-match-status">{match.status.replaceAll('_', ' ')}</span></article>)}</div>}
+  return (
+    <section className="secretary-dashboard">
+      <div className="secretary-heading">
+        <div><span className="eyebrow">CAMPUS OPERATIONS</span><h1>University overview</h1><p>Your competitions, squads, players, and match schedule.</p></div>
+        <Link className="button button-primary" to="/secretary/competitions"><Trophy size={15} /> New competition</Link>
+      </div>
+      {!supabase && <div className="inline-notice notice-warning"><CircleDot size={17} /><span>Connect Supabase to load university data.</span></div>}
+      {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
+      <div className="secretary-metric-grid">
+        {metrics.map(({ label, value, icon: Icon, tone, href }) => (
+          <Link className="secretary-metric" to={href} key={label}>
+            <span className={`secretary-metric-icon secretary-tone-${tone}`}><Icon size={18} /></span>
+            <strong>{loading ? '—' : value.toLocaleString()}</strong><span>{label}</span>
+            <ChevronRight className="secretary-metric-arrow" size={15} />
+          </Link>
+        ))}
+      </div>
+      <section className="secretary-panel secretary-fixtures">
+        <div className="secretary-panel-heading">
+          <div><span className="eyebrow">UP NEXT</span><h2>Upcoming fixtures</h2></div>
+          <Link to="/secretary/matches">All fixtures <ChevronRight size={14} /></Link>
+        </div>
+        {loading ? <div className="secretary-empty">Loading fixtures…</div> : matches.length === 0 ? (
+          <div className="secretary-empty">
+            <CalendarDays size={22} /><strong>No upcoming fixtures</strong><span>Create a fixture to build your match calendar.</span>
+            <Link className="button button-secondary" to="/secretary/matches">Schedule a match</Link>
+          </div>
+        ) : (
+          <div className="secretary-fixture-list">
+            {matches.map((match) => (
+              <article className="secretary-fixture-row" key={match.id}>
+                <span className="secretary-fixture-date">
+                  {new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(new Date(match.kickoff_at))}
+                  <small>{new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(match.kickoff_at))}</small>
+                </span>
+                <span className="secretary-fixture-teams">
+                  <strong>{teamNames[match.home_team_id] ?? 'Home side'} <i>vs</i> {teamNames[match.away_team_id] ?? 'Away side'}</strong>
+                  <small>{competitionNames[match.competition_id] ?? 'University fixture'}</small>
+                </span>
+                <span className="secretary-match-status">{match.status.replaceAll('_', ' ')}</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+      <div className="secretary-quick-links">
+        <Link to="/secretary/teams"><Users size={17} /><span><strong>Register a team</strong><small>Set up a campus squad</small></span><ChevronRight size={15} /></Link>
+        <Link to="/secretary/players"><GraduationCap size={17} /><span><strong>Add a player</strong><small>Build the university roster</small></span><ChevronRight size={15} /></Link>
+      </div>
     </section>
-    <div className="secretary-quick-links"><Link to="/secretary/teams"><Users size={17} /><span><strong>Register a team</strong><small>Set up a campus squad</small></span><ChevronRight size={15} /></Link><Link to="/secretary/players"><GraduationCap size={17} /><span><strong>Add a player</strong><small>Build the university roster</small></span><ChevronRight size={15} /></Link></div>
-  </section>
+  )
 }
 
 const optionSets: Record<string, Option[]> = {
@@ -216,9 +308,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   function getFields() {
     return fieldsByKind[kind].map((field) => ({
       ...field,
-      options: field.name === 'home_team_id' || field.name === 'away_team_id' ? teamOptions
-        : field.name === 'competition_id' ? competitionOptions
-          : field.options,
+      options: field.name === 'home_team_id' || field.name === 'away_team_id' ? teamOptions : field.name === 'competition_id' ? competitionOptions : field.options,
     }))
   }
 
@@ -229,12 +319,8 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     const form = event.currentTarget
     const values = new FormData(form)
     const text = (name: string) => String(values.get(name) ?? '').trim()
-    if (kind === 'teams' && text('type') === 'class_team' && !text('academic_class')) {
-      setBusy(false); setError('Enter the class or cohort for this team.'); return
-    }
-    if (kind === 'matches' && text('home_team_id') === text('away_team_id')) {
-      setBusy(false); setError('Choose two different teams.'); return
-    }
+    if (kind === 'teams' && text('type') === 'class_team' && !text('academic_class')) { setBusy(false); setError('Enter the class or cohort for this team.'); return }
+    if (kind === 'matches' && text('home_team_id') === text('away_team_id')) { setBusy(false); setError('Choose two different teams.'); return }
     const payload = buildPayload(kind, values, universityId, session?.user.id ?? '')
     const { error: insertError } = await supabase.from(config.table).insert(payload as never).select('id').single()
     setBusy(false)
@@ -248,19 +334,72 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   const names = Object.fromEntries(teamOptions.map((option) => [option.value, option.label]))
   const competitions = Object.fromEntries(competitionOptions.map((option) => [option.value, option.label]))
 
-  return <section className="secretary-record-page">
-    <div className="secretary-heading"><div><span className="eyebrow">CAMPUS OPERATIONS</span><h1>{config.title}</h1><p>{config.description}</p></div><span className="secretary-record-total">{loading ? 'Loading' : `${rows.length} ${rows.length === 1 ? 'record' : 'records'}`}</span></div>
-    {notice && <div className="inline-notice notice-success" role="status">{notice}</div>}
-    {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
-    <div className="secretary-record-layout">
-      <section className="secretary-panel secretary-create-panel"><div className="secretary-panel-heading"><div><span className="eyebrow">NEW RECORD</span><h2>{kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div><CircleDot size={17} /></div>
-        <form className="secretary-record-form" onSubmit={(event) => void createRecord(event)}><div className="secretary-field-grid">{fields.map((field) => <label className={field.full ? 'secretary-field secretary-field-full' : 'secretary-field'} key={field.name}>{field.label}{field.options ? <select name={field.name} required={field.required}><option value="">Choose {field.label.toLowerCase()}</option>{field.options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select> : <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />}</label>)}</div>{kind === 'competitions' && <p className="secretary-form-note">New competitions are saved as drafts. A platform administrator publishes them.</p>}{kind === 'matches' && (!teamOptions.length || !competitionOptions.length) && <p className="secretary-form-note">Add at least one competition and two teams before scheduling a fixture.</p>}<button className="button button-primary" type="submit" disabled={busy || (kind === 'matches' && (!teamOptions.length || !competitionOptions.length))}>{busy ? 'Saving…' : `Save ${singularLabels[kind]}`}</button></form>
-      </section>
-      <section className="secretary-panel secretary-list-panel"><div className="secretary-panel-heading"><div><span className="eyebrow">UNIVERSITY RECORDS</span><h2>Current {config.title.toLowerCase()}</h2></div><span className="secretary-list-count">{rows.length}</span></div>
-        {loading ? <div className="secretary-empty">Loading records…</div> : rows.length === 0 ? <div className="secretary-empty"><Building2 size={21} /><strong>No {config.title.toLowerCase()} yet</strong><span>Your new records will appear here.</span></div> : <div className="secretary-table-wrap"><table className="secretary-table"><thead><tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={String(row.id)}>{config.columns.map((column) => <td key={column}>{formatCell(kind, column, row[column], names, competitions)}</td>)}</tr>)}</tbody></table></div>}
-      </section>
-    </div>
-  </section>
+  return (
+    <section className="secretary-record-page">
+      <div className="secretary-heading">
+        <div><span className="eyebrow">CAMPUS OPERATIONS</span><h1>{config.title}</h1><p>{config.description}</p></div>
+        <span className="secretary-record-total">{loading ? 'Loading' : `${rows.length} ${rows.length === 1 ? 'record' : 'records'}`}</span>
+      </div>
+      {notice && <div className="inline-notice notice-success" role="status">{notice}</div>}
+      {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
+      <div className="secretary-record-layout">
+        <section className="secretary-panel secretary-create-panel">
+          <div className="secretary-panel-heading">
+            <div><span className="eyebrow">NEW RECORD</span><h2>{kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div>
+            <CircleDot size={17} />
+          </div>
+          <form className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
+            <div className="secretary-field-grid">
+              {fields.map((field) => (
+                <label className={field.full ? 'secretary-field secretary-field-full' : 'secretary-field'} key={field.name}>
+                  {field.label}
+                  {field.options ? (
+                    <select name={field.name} required={field.required}>
+                      <option value="">Choose {field.label.toLowerCase()}</option>
+                      {field.options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                    </select>
+                  ) : (
+                    <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />
+                  )}
+                </label>
+              ))}
+            </div>
+            {kind === 'competitions' && <p className="secretary-form-note">New competitions are saved as drafts. A platform administrator publishes them.</p>}
+            {kind === 'matches' && (!teamOptions.length || !competitionOptions.length) && <p className="secretary-form-note">Add at least one competition and two teams before scheduling a fixture.</p>}
+            <button className="button button-primary" type="submit" disabled={busy || (kind === 'matches' && (!teamOptions.length || !competitionOptions.length))}>
+              {busy ? 'Saving…' : `Save ${singularLabels[kind]}`}
+            </button>
+          </form>
+        </section>
+        <section className="secretary-panel secretary-list-panel">
+          <div className="secretary-panel-heading">
+            <div><span className="eyebrow">UNIVERSITY RECORDS</span><h2>Current {config.title.toLowerCase()}</h2></div>
+            <span className="secretary-list-count">{rows.length}</span>
+          </div>
+          {loading ? <div className="secretary-empty">Loading records…</div> : rows.length === 0 ? (
+            <div className="secretary-empty">
+              <Building2 size={21} /><strong>No {config.title.toLowerCase()} yet</strong><span>Your new records will appear here.</span>
+            </div>
+          ) : (
+            <div className="secretary-table-wrap">
+              <table className="secretary-table">
+                <thead>
+                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={String(row.id)}>
+                      {config.columns.map((column) => <td key={column}>{formatCell(kind, column, row[column], names, competitions)}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    </section>
+  )
 }
 
 function buildPayload(kind: RecordKind, values: FormData, universityId: string, userId: string) {
@@ -277,8 +416,8 @@ function formatCell(kind: RecordKind, column: string, value: unknown, teams: Rec
     if (column === 'type' && kind === 'teams') return 'University team'
     return '—'
   }
-  if (column === 'home_team_id') return teams[String(value)] ?? 'Home team'
-  if (column === 'away_team_id') return teams[String(value)] ?? 'Away team'
+  if (column === 'home_team_id') return teams[String(value)] ?? 'Home side'
+  if (column === 'away_team_id') return teams[String(value)] ?? 'Away side'
   if (column === 'competition_id') return competitions[String(value)] ?? 'Competition'
   if (column === 'kickoff_at' || column === 'start_date' || column === 'end_date') return new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(String(value)))
   return String(value).replaceAll('_', ' ')
