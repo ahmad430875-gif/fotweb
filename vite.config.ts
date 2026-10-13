@@ -3,5 +3,9 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 3000, strictPort: true },
+  base: '/fotweb/', // <-- Add this line so it knows your repository path
+  server: { 
+    port: 3000, 
+    strictPort: true 
+  },
 })
