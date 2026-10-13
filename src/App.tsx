@@ -45,7 +45,7 @@ function App() {
         </Route>
       </Route>
       <Route path="/forbidden" element={<main className="access-state"><span className="eyebrow">UNIVERSITY ACCESS</span><h1>This portal is for platform administrators.</h1><p>University Sports Secretaries can only use the administration portal assigned to their university.</p><a className="button button-secondary" href="/admin/login">Return to sign in</a></main>} />
-      <Route path="*" element={<Navigate to="/admin" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
