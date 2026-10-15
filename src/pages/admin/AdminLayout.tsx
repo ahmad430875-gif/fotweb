@@ -1,10 +1,11 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Building2, ChevronDown, Command, LayoutDashboard, LogOut, Menu, ShieldCheck } from 'lucide-react'
+import { Building2, ChevronDown, Command, LayoutDashboard, LogOut, Menu, Newspaper, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { FootballLogo } from '../../components/FootballLogo'
 
 function currentTitle(pathname: string) {
+  if (pathname.startsWith('/admin/news')) return 'News Center'
   if (pathname.startsWith('/admin/universities/new')) return 'Add university'
   if (pathname.startsWith('/admin/universities/')) return 'University overview'
   if (pathname.startsWith('/admin/universities')) return 'Universities'
@@ -33,10 +34,11 @@ export function AdminLayout() {
       <nav className="admin-nav" aria-label="Admin navigation">
         <NavLink to="/admin" end className={({ isActive }) => `admin-nav-link ${isActive ? 'admin-nav-active' : ''}`} onClick={() => setMobileNavOpen(false)}><LayoutDashboard size={17} /><span>Dashboard</span></NavLink>
         <NavLink to="/admin/universities" className={({ isActive }) => `admin-nav-link ${isActive ? 'admin-nav-active' : ''}`} onClick={() => setMobileNavOpen(false)}><Building2 size={17} /><span>Universities</span></NavLink>
+        <NavLink to="/admin/news" className={({ isActive }) => `admin-nav-link ${isActive ? 'admin-nav-active' : ''}`} onClick={() => setMobileNavOpen(false)}><Newspaper size={17} /><span>News Center</span></NavLink>
       </nav>
-      <div className="sidebar-coming"><span className="nav-label">PLATFORM DATA</span><p>Competitions, teams, players and match operations are introduced in upcoming phases.</p></div>
-      <div className="sidebar-account"><span className="account-avatar">{(profile?.display_name || session?.user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="account-copy"><strong>{profile?.display_name || 'Platform admin'}</strong><small>{session?.user.email}</small></span><button className="icon-button account-logout" type="button" title="Sign out" aria-label="Sign out" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={16} /></button></div>
+      <div className="sidebar-coming"><span className="nav-label">PLATFORM DATA</span><p>Manage institutions and published football news across the network.</p></div>
+      <div className="sidebar-account"><span className="account-avatar">{(profile?.display_name || session?.user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="account-copy"><strong>{profile?.display_name || 'Platform admin'}</strong><small>{session?.user.email}</small></span></div>
     </aside>
-    <div className="admin-main"><header className="admin-topbar"><div className="topbar-leading"><button className="icon-button mobile-menu-button" type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button><div className="breadcrumbs"><span>Platform</span><span>/</span><strong>{currentTitle(location.pathname)}</strong></div></div><div className="topbar-status"><span><ShieldCheck size={15} /> Super Admin</span><span className="secure-indicator"><i /> Secure session</span></div></header><div className="admin-content"><Outlet /></div></div>
+    <div className="admin-main"><header className="admin-topbar"><div className="topbar-leading"><button className="icon-button mobile-menu-button" type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button><div className="breadcrumbs"><span>Platform</span><span>/</span><strong>{currentTitle(location.pathname)}</strong></div></div><div className="topbar-status"><span><ShieldCheck size={15} /> Super Admin</span><span className="secure-indicator"><i /> Secure session</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div></header><div className="admin-content"><Outlet /></div></div>
   </div>
 }

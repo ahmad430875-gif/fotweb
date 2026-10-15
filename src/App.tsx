@@ -9,9 +9,10 @@ import { UniversityCreatePage, UniversityDetailPage, UniversityListPage } from '
 import { ResetPasswordPage } from './pages/admin/ResetPasswordPage'
 import { PublicCompetitionsPage, PublicHomePage, PublicUniversitiesPage } from './pages/PublicPages'
 import { PublicPlayerDetailPage, PublicSquadDetailPage, PublicTeamDetailPage, PublicUniversityDetailPage } from './pages/PublicDetailPages'
-import { CompetitionDetailPage } from './pages/CompetitionDetailPage'
+import { CompetitionCentrePage } from './pages/CompetitionCentrePage'
 import { MatchDetailPage } from './pages/MatchDetailPage'
 import { OAuthConsentPage } from './pages/OAuthConsentPage'
+import { NewsManagementPage } from './pages/admin/NewsManagementPage'
 import { SecretaryDashboardPage, SecretaryLayout, SecretaryRecordsPage } from './pages/secretary/SecretaryPortal'
 import { SecretaryAnnouncementsPage, SecretaryLiveMatchPage, SecretarySettingsPage, SecretaryStatisticsPage, SecretaryStandingsPage, SecretaryUniversityTeamPage } from './pages/secretary/SecretaryAdvancedPages'
 
@@ -20,7 +21,7 @@ function App() {
     <Routes>
       <Route path="/" element={<PublicHomePage />} />
       <Route path="/competitions" element={<PublicCompetitionsPage />} />
-      <Route path="/competitions/:id" element={<CompetitionDetailPage />} />
+      <Route path="/competitions/:id" element={<CompetitionCentrePage />} />
       <Route path="/matches/:id" element={<MatchDetailPage />} />
       <Route path="/universities" element={<PublicUniversitiesPage />} />
       <Route path="/universities/:id" element={<PublicUniversityDetailPage />} />
@@ -40,6 +41,7 @@ function App() {
           <Route path="teams" element={<SecretaryRecordsPage kind="teams" />} />
           <Route path="players" element={<SecretaryRecordsPage kind="players" />} />
           <Route path="matches" element={<SecretaryRecordsPage kind="matches" />} />
+          <Route path="news" element={<NewsManagementPage scope="university" />} />
           <Route path="live" element={<SecretaryLiveMatchPage />} />
           <Route path="standings" element={<SecretaryStandingsPage />} />
           <Route path="statistics" element={<SecretaryStatisticsPage />} />
@@ -53,6 +55,7 @@ function App() {
           <Route path="universities" element={<UniversityListPage />} />
           <Route path="universities/new" element={<UniversityCreatePage />} />
           <Route path="universities/:id" element={<UniversityDetailPage />} />
+          <Route path="news" element={<NewsManagementPage scope="platform" />} />
         </Route>
       </Route>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDot, GraduationCap, LayoutDashboard, LogOut, Megaphone, Menu, Radio, Settings, Table2, Trophy, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDot, GraduationCap, LayoutDashboard, LogOut, Megaphone, Menu, Newspaper, Radio, Settings, Table2, Trophy, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { FootballLogo } from '../../components/FootballLogo'
@@ -17,6 +17,7 @@ const navigation = [
   { to: '/secretary/team', label: 'University Team', icon: Building2 },
   { to: '/secretary/players', label: 'Players', icon: GraduationCap },
   { to: '/secretary/announcements', label: 'Squad Announcements', icon: Megaphone },
+  { to: '/secretary/news', label: 'News Center', icon: Newspaper },
   { to: '/secretary/competitions', label: 'Competitions', icon: Trophy },
   { to: '/secretary/teams', label: 'All Teams', icon: Users },
   { to: '/secretary/matches', label: 'Fixtures & Results', icon: CalendarDays },
@@ -84,15 +85,6 @@ export function SecretaryLayout() {
               <small className="block truncate text-gray-400">{session?.user.email}</small>
             </span>
           </div>
-          <button 
-            type="button" 
-            disabled={signingOut} 
-            onClick={() => void handleSignOut()}
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-medium text-red-400 transition-colors rounded-lg bg-red-500/10 hover:bg-red-500/20 hover:text-red-300"
-          >
-            <LogOut size={14} />
-            <span>{signingOut ? 'Signing out...' : 'Log out'}</span>
-          </button>
         </div>
       </aside>
 
@@ -103,10 +95,10 @@ export function SecretaryLayout() {
               <Menu size={19} />
             </button>
             <div className="secretary-breadcrumb">
-              <span>University</span><span>/</span><strong>{navigation.find((item) => item.to === location.pathname)?.label ?? 'Operations'}</strong>
+              <span>University</span><span>/</span><strong>{navigation.find((item) => item.to === location.pathname)?.label ?? (location.pathname === '/secretary/news' ? 'News Center' : 'Operations')}</strong>
             </div>
           </div>
-          <span className="secretary-secure"><i /> University access</span>
+          <div className="secretary-topbar-actions"><span className="secretary-secure"><i /> University access</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div>
         </header>
         <div className="secretary-content">
           <Outlet context={{ universityName }} />
@@ -296,8 +288,12 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     if (!supabase || !universityId) { setLoading(false); return }
     setLoading(true)
     const { data, error: loadError } = await supabase.from(config.table).select(config.select).eq('university_id', universityId).order(config.order, { ascending: kind === 'teams' || kind === 'players' }).limit(100)
-    if (loadError) setError('Records could not be loaded. Check your connection and try again.')
-    else { setRows((data ?? []) as unknown as Row[]); setError('') }
+    if (loadError) {
+      setRows([])
+      setError(loadError.message.includes('batch_session')
+        ? 'The database is missing the batch/session fields. Apply migration 202610150003_academic_progression.sql in Supabase, then refresh this page.'
+        : `Records could not be loaded: ${loadError.message}`)
+    } else { setRows((data ?? []) as unknown as Row[]); setError('') }
     if (kind === 'matches' || kind === 'teams') {
       const [teams, competitions] = await Promise.all([
         supabase.from('teams').select('id, name').eq('university_id', universityId),
