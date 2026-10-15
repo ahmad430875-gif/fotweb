@@ -11,6 +11,9 @@ export function CompetitionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Standings fetched from DB view when available; fallback to client-side calc
+  const [standings, setStandings] = useState<any[] | null>(null)
+
   useEffect(() => {
     let active = true
     async function loadCompetitionDetails() {
@@ -53,8 +56,39 @@ export function CompetitionDetailPage() {
     return () => { active = false }
   }, [id])
 
-  const standings = useMemo(() => {
-    // compute standings from finished matches
+  // Try to load aggregated standings from DB view (competition_standings)
+  useEffect(() => {
+    if (!supabase || !id) return
+    let active = true
+    async function loadStandings() {
+      try {
+        const { data, error } = await supabase
+          .from('competition_standings')
+          .select('team_id, team_name, short_name, logo_url, played, wins, draws, losses, gf, ga, gd, pts')
+          .eq('competition_id', id)
+          .order('pts', { ascending: false })
+          .order('gd', { ascending: false })
+          .order('gf', { ascending: false })
+
+        if (!active) return
+        if (error) {
+          console.error('Standings query failed', error)
+          setStandings(null) // fallback to client computation
+        } else {
+          setStandings(data ?? [])
+        }
+      } catch (err) {
+        console.error('Standings load error', err)
+        if (active) setStandings(null)
+      }
+    }
+
+    void loadStandings()
+    return () => { active = false }
+  }, [id])
+
+  // Client-side fallback standings computation (used only if view is unavailable)
+  const computedStandings = useMemo(() => {
     const table: Record<string, { teamId: string; teamName: string; played: number; wins: number; draws: number; losses: number; gf: number; ga: number; gd: number; pts: number }> = {}
     const finished = matches.filter((m) => m.status === 'full_time')
     finished.forEach((m) => {
@@ -86,11 +120,12 @@ export function CompetitionDetailPage() {
       }
     })
 
-    // finalize gd and sort
     const rows = Object.values(table).map((r) => ({ ...r, gd: r.gf - r.ga }))
     rows.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
     return rows
   }, [matches, teams])
+
+  const finalStandings = standings ?? computedStandings
 
   if (loading) {
     return <div className="p-12 text-center text-gray-500">Loading competition details...</div>
@@ -135,7 +170,7 @@ export function CompetitionDetailPage() {
           <Trophy size={18} className="text-gray-700" />
           <h2 className="text-lg font-bold text-gray-900">Standings</h2>
         </div>
-        {standings.length === 0 ? (
+        {finalStandings.length === 0 ? (
           <div className="text-center py-6 text-gray-500">Standings will appear once matches are completed.</div>
         ) : (
           <table className="w-full text-sm">
@@ -154,10 +189,10 @@ export function CompetitionDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {standings.map((row, idx) => (
-                <tr key={row.teamId} className="border-b">
+              {finalStandings.map((row, idx) => (
+                <tr key={row.teamId ?? row.team_id} className="border-b">
                   <td className="py-2 text-xs text-gray-600">{idx + 1}</td>
-                  <td className="py-2 font-medium">{row.teamName}</td>
+                  <td className="py-2 font-medium">{row.teamName ?? row.team_name}</td>
                   <td className="py-2 text-right">{row.played}</td>
                   <td className="py-2 text-right">{row.wins}</td>
                   <td className="py-2 text-right">{row.draws}</td>
