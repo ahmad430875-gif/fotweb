@@ -104,7 +104,7 @@ function usePublicData() {
   return state
 }
 
-function PublicFrame({ children }: { children: React.ReactNode }) {
+export function PublicFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="public-site">
       <header className="public-header">
@@ -308,7 +308,7 @@ export function PublicUniversitiesPage() {
           ) : (
             <div className="public-university-grid">
               {visible.map((university) => (
-                <article className="public-university-card" key={university.id}>
+                <Link className="public-university-card" to={`/universities/${university.id}`} key={university.id}>
                   <UniversityMark university={university} large />
                   <div>
                     <span className="public-overline">{university.short_name}</span>
@@ -316,7 +316,7 @@ export function PublicUniversitiesPage() {
                     <span className="public-location"><MapPin size={14} />{university.location}</span>
                   </div>
                   <span className="public-card-arrow"><ArrowRight size={16} /></span>
-                </article>
+                </Link>
               ))}
             </div>
           )}
@@ -360,7 +360,7 @@ function MatchRow({ match, teams, competitions }: { match: PublicMatch; teams: P
   const status = live ? (match.status === 'half_time' ? 'Half-time' : 'Live') : (match.status === 'full_time' ? 'Full time' : formatDate(match.kickoff_at))
 
   return (
-    <article className="public-match-row">
+    <Link className="public-match-row" to={`/matches/${match.id}`}>
       <div className="public-match-context">
         <span className={live ? 'public-live-label' : 'public-match-date'}>
           {live && <i />}
@@ -382,7 +382,7 @@ function MatchRow({ match, teams, competitions }: { match: PublicMatch; teams: P
         <strong>{scored ? `${match.home_score} : ${match.away_score}` : 'v'}</strong>
         <span>{match.round || (match.venue ? match.venue : 'Match day')}</span>
       </div>
-    </article>
+    </Link>
   )
 }
 

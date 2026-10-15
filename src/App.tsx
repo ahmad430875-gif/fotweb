@@ -8,6 +8,7 @@ import { LoginPage } from './pages/admin/LoginPage'
 import { UniversityCreatePage, UniversityDetailPage, UniversityListPage } from './pages/admin/UniversityPages'
 import { ResetPasswordPage } from './pages/admin/ResetPasswordPage'
 import { PublicCompetitionsPage, PublicHomePage, PublicUniversitiesPage } from './pages/PublicPages'
+import { PublicPlayerDetailPage, PublicSquadDetailPage, PublicTeamDetailPage, PublicUniversityDetailPage } from './pages/PublicDetailPages'
 import { CompetitionDetailPage } from './pages/CompetitionDetailPage'
 import { MatchDetailPage } from './pages/MatchDetailPage'
 import { OAuthConsentPage } from './pages/OAuthConsentPage'
@@ -22,6 +23,10 @@ function App() {
       <Route path="/competitions/:id" element={<CompetitionDetailPage />} />
       <Route path="/matches/:id" element={<MatchDetailPage />} />
       <Route path="/universities" element={<PublicUniversitiesPage />} />
+      <Route path="/universities/:id" element={<PublicUniversityDetailPage />} />
+      <Route path="/teams/:id" element={<PublicTeamDetailPage />} />
+      <Route path="/players/:id" element={<PublicPlayerDetailPage />} />
+      <Route path="/squads/:id" element={<PublicSquadDetailPage />} />
       <Route path="/admin/login" element={<LoginPage />} />
       <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
       <Route path="/oauth/consent" element={<OAuthConsentPage />} />

@@ -1351,7 +1351,7 @@ export function SecretaryStatisticsPage() {
   const { profile } = useAuth()
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [competitionId, setCompetitionId] = useState('')
-  const [players, setPlayers] = useState<Array<{ player_id: string; full_name: string; team_name: string; appearances: number; goals: number; assists: number; yellow_cards: number; red_cards: number }>>([])
+  const [players, setPlayers] = useState<Array<{ player_id: string; full_name: string; team_name: string; appearances: number; goals: number; assists: number; yellow_cards: number; red_cards: number; clean_sheets: number }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -1377,7 +1377,7 @@ export function SecretaryStatisticsPage() {
       return 
     }
     supabase.from('competition_player_stats')
-      .select('player_id, full_name, team_name, appearances, goals, assists, yellow_cards, red_cards')
+      .select('player_id, full_name, team_name, appearances, goals, assists, yellow_cards, red_cards, clean_sheets')
       .eq('competition_id', competitionId)
       .order('goals', { ascending: false })
       .order('assists', { ascending: false })
@@ -1387,6 +1387,9 @@ export function SecretaryStatisticsPage() {
   const topGoals = [...players].sort((a, b) => b.goals - a.goals || b.assists - a.assists).slice(0, 5)
   const topAssists = [...players].sort((a, b) => b.assists - a.assists || b.goals - a.goals).slice(0, 5)
   const mostAppearances = [...players].sort((a, b) => b.appearances - a.appearances).slice(0, 5)
+  const mostCleanSheets = [...players].sort((a, b) => b.clean_sheets - a.clean_sheets || b.appearances - a.appearances).slice(0, 5)
+  const mostYellowCards = [...players].sort((a, b) => b.yellow_cards - a.yellow_cards).slice(0, 5)
+  const mostRedCards = [...players].sort((a, b) => b.red_cards - a.red_cards).slice(0, 5)
 
   return (
     <section className="secretary-record-page">
@@ -1416,7 +1419,10 @@ export function SecretaryStatisticsPage() {
           {[
             { title: 'Top scorers', field: 'goals' as const, list: topGoals }, 
             { title: 'Top assists', field: 'assists' as const, list: topAssists }, 
-            { title: 'Most appearances', field: 'appearances' as const, list: mostAppearances }
+            { title: 'Most appearances', field: 'appearances' as const, list: mostAppearances },
+            { title: 'Most clean sheets', field: 'clean_sheets' as const, list: mostCleanSheets },
+            { title: 'Yellow cards', field: 'yellow_cards' as const, list: mostYellowCards },
+            { title: 'Red cards', field: 'red_cards' as const, list: mostRedCards }
           ].map((group) => (
             <section className="secretary-panel secretary-stats-panel" key={group.title}>
               <div className="secretary-panel-heading">

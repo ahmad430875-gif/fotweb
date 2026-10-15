@@ -281,6 +281,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   const [rows, setRows] = useState<Row[]>([])
   const [teamOptions, setTeamOptions] = useState<Option[]>([])
   const [competitionOptions, setCompetitionOptions] = useState<Option[]>([])
+  const [teamRegistration, setTeamRegistration] = useState({ team_id: '', competition_id: '' })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -292,7 +293,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     const { data, error: loadError } = await supabase.from(config.table).select(config.select).eq('university_id', universityId).order(config.order, { ascending: kind === 'teams' || kind === 'players' }).limit(100)
     if (loadError) setError('Records could not be loaded. Check your connection and try again.')
     else { setRows((data ?? []) as unknown as Row[]); setError('') }
-    if (kind === 'matches') {
+    if (kind === 'matches' || kind === 'teams') {
       const [teams, competitions] = await Promise.all([
         supabase.from('teams').select('id, name').eq('university_id', universityId),
         supabase.from('competitions').select('id, name').eq('university_id', universityId),
@@ -327,6 +328,44 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     if (insertError) { setError(friendlyRecordError(insertError.message)); return }
     form.reset()
     setNotice(`${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} added.`)
+    await loadRows()
+  }
+
+  async function registerTeam(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!supabase || !universityId) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const { error: registrationError } = await supabase.from('competition_teams').upsert({
+      competition_id: teamRegistration.competition_id,
+      team_id: teamRegistration.team_id,
+      university_id: universityId,
+    }, { onConflict: 'competition_id,team_id' })
+    setBusy(false)
+    if (registrationError) {
+      setError(friendlyRecordError(registrationError.message))
+      return
+    }
+    setTeamRegistration({ team_id: '', competition_id: '' })
+    setNotice('Team registered for the competition.')
+  }
+
+  async function toggleFixturePublication(row: Row) {
+    if (!supabase) return
+    const isPublished = Boolean(row.published_at)
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const { error: updateError } = await supabase.from('matches').update({
+      published_at: isPublished ? null : new Date().toISOString(),
+    }).eq('id', String(row.id))
+    setBusy(false)
+    if (updateError) {
+      setError(updateError.message.includes('locked') ? 'This match or competition is locked by a platform administrator.' : 'Fixture publication could not be updated.')
+      return
+    }
+    setNotice(isPublished ? 'Fixture withdrawn from public pages.' : 'Fixture published on public pages.')
     await loadRows()
   }
 
@@ -370,6 +409,16 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
               {busy ? 'Saving…' : `Save ${singularLabels[kind]}`}
             </button>
           </form>
+          {kind === 'teams' && <form className="secretary-record-form secretary-team-registration" onSubmit={(event) => void registerTeam(event)}>
+            <div className="secretary-panel-heading">
+              <div><span className="eyebrow">COMPETITION ENTRY</span><h2>Register an existing team</h2></div>
+            </div>
+            <div className="secretary-field-grid">
+              <label className="secretary-field">Team<select required value={teamRegistration.team_id} onChange={(event) => setTeamRegistration((current) => ({ ...current, team_id: event.target.value }))}><option value="">Select team</option>{teamOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+              <label className="secretary-field">Competition<select required value={teamRegistration.competition_id} onChange={(event) => setTeamRegistration((current) => ({ ...current, competition_id: event.target.value }))}><option value="">Select competition</option>{competitionOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+            </div>
+            <button className="button button-secondary" type="submit" disabled={busy || !teamOptions.length || !competitionOptions.length}>Register team</button>
+          </form>}
         </section>
         <section className="secretary-panel secretary-list-panel">
           <div className="secretary-panel-heading">
@@ -384,12 +433,13 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             <div className="secretary-table-wrap">
               <table className="secretary-table">
                 <thead>
-                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}</tr>
+                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}</tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={String(row.id)}>
                       {config.columns.map((column) => <td key={column}>{formatCell(kind, column, row[column], names, competitions)}</td>)}
+                      {kind === 'matches' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -405,9 +455,35 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
 function buildPayload(kind: RecordKind, values: FormData, universityId: string, userId: string) {
   const text = (name: string) => String(values.get(name) ?? '').trim()
   const base = { university_id: universityId, created_by: userId }
-  if (kind === 'competitions') return { ...base, name: text('name'), season: text('season'), type: text('type'), format: text('format'), start_date: text('start_date'), end_date: text('end_date'), venue: text('venue') || null, status: 'draft' }
+  if (kind === 'competitions') return {
+    ...base,
+    name: text('name'),
+    season: text('season'),
+    type: text('type'),
+    format: text('format'),
+    start_date: text('start_date'),
+    end_date: text('end_date'),
+    venue: text('venue') || null,
+    points_for_win: Number(text('points_for_win') || 3),
+    points_for_draw: Number(text('points_for_draw') || 1),
+    points_for_loss: Number(text('points_for_loss') || 0),
+    status: 'draft',
+  }
   if (kind === 'teams') return { ...base, name: text('name'), short_name: text('short_name'), type: text('type'), academic_class: text('type') === 'class_team' ? text('academic_class') : null }
-  if (kind === 'players') return { ...base, full_name: text('full_name'), academic_program: text('academic_program') || null, current_academic_year: text('current_academic_year') || null, position: text('position') || null, preferred_foot: text('preferred_foot') || null }
+  if (kind === 'players') return {
+    ...base,
+    full_name: text('full_name'),
+    student_identifier: text('student_identifier') || null,
+    photo_url: text('photo_url') || null,
+    academic_program: text('academic_program') || null,
+    current_academic_year: text('current_academic_year') || null,
+    height_cm: text('height_cm') ? Number(text('height_cm')) : null,
+    position: text('position') || null,
+    preferred_foot: text('preferred_foot') || null,
+    injury_status: text('injury_status') || 'fit',
+    is_available: text('is_available') !== 'false',
+    public_injury_status: text('public_injury_status') === 'true',
+  }
   return { ...base, competition_id: text('competition_id'), home_team_id: text('home_team_id'), away_team_id: text('away_team_id'), kickoff_at: new Date(text('kickoff_at')).toISOString(), round: text('round') || null, venue: text('venue') || null, status: 'scheduled' }
 }
 
