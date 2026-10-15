@@ -9,6 +9,7 @@ import { UniversityCreatePage, UniversityDetailPage, UniversityListPage } from '
 import { ResetPasswordPage } from './pages/admin/ResetPasswordPage'
 import { PublicCompetitionsPage, PublicHomePage, PublicUniversitiesPage } from './pages/PublicPages'
 import { CompetitionDetailPage } from './pages/CompetitionDetailPage'
+import { MatchDetailPage } from './pages/MatchDetailPage'
 import { OAuthConsentPage } from './pages/OAuthConsentPage'
 import { SecretaryDashboardPage, SecretaryLayout, SecretaryRecordsPage } from './pages/secretary/SecretaryPortal'
 import { SecretaryAnnouncementsPage, SecretaryLiveMatchPage, SecretarySettingsPage, SecretaryStatisticsPage, SecretaryStandingsPage, SecretaryUniversityTeamPage } from './pages/secretary/SecretaryAdvancedPages'
@@ -19,6 +20,7 @@ function App() {
       <Route path="/" element={<PublicHomePage />} />
       <Route path="/competitions" element={<PublicCompetitionsPage />} />
       <Route path="/competitions/:id" element={<CompetitionDetailPage />} />
+      <Route path="/matches/:id" element={<MatchDetailPage />} />
       <Route path="/universities" element={<PublicUniversitiesPage />} />
       <Route path="/admin/login" element={<LoginPage />} />
       <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
@@ -49,7 +51,7 @@ function App() {
         </Route>
       </Route>
 
-      <Route path="/forbidden" element={<main className="access-state"><span className="eyebrow">UNIVERSITY ACCESS</span><h1>This portal is for platform administrators.</h1><p>University Sports Secretaries can only use the administration portal assigned to their university.</p><a className="button button-secondary" href="/admin/login">Return to sign in</a></main>} />
+      <Route path="/forbidden" element={<main className="access-state"><span className="eyebrow">UNIVERSITY ACCESS</span><h1>This portal is for platform administrators.</h1><p>University Sports Secretaries must sign in with an authorized university account.</p></main>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
