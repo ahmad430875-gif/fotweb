@@ -216,6 +216,8 @@ const optionSets: Record<string, Option[]> = {
   competitionType: [{ label: 'Inter-class', value: 'inter_class' }, { label: 'Inter-university', value: 'inter_university' }, { label: 'Inter-college', value: 'inter_college' }, { label: 'Other', value: 'other' }],
   competitionFormat: [{ label: 'League', value: 'league' }, { label: 'Group stage', value: 'group_stage' }, { label: 'Knockout', value: 'knockout' }, { label: 'League + knockout', value: 'league_knockout' }, { label: 'Round robin', value: 'round_robin' }],
   teamType: [{ label: 'University team', value: 'university_team' }, { label: 'Class team', value: 'class_team' }],
+  academicYear: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'HO', 'PGr', 'Other'].map((value) => ({ label: value, value })),
+  academicProgram: ['MBBS', 'BDS', 'DPT', 'Pharm-D', 'Nursing', 'Other'].map((value) => ({ label: value, value })),
   foot: [{ label: 'Right', value: 'right' }, { label: 'Left', value: 'left' }, { label: 'Both', value: 'both' }],
   position: ['Goalkeeper', 'Centre-back', 'Full-back', 'Wing-back', 'Defensive midfielder', 'Central midfielder', 'Attacking midfielder', 'Winger', 'Striker'].map((value) => ({ label: value, value })),
   injury: [{ label: 'Fit', value: 'fit' }, { label: 'Injured', value: 'injured' }, { label: 'Recovering', value: 'recovering' }],
@@ -240,14 +242,16 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
     { name: 'name', label: 'Team name', required: true },
     { name: 'short_name', label: 'Short name', required: true },
     { name: 'type', label: 'Team type', type: 'select', options: optionSets.teamType, required: true },
-    { name: 'academic_class', label: 'Class / cohort', placeholder: 'Required for class teams' },
+    { name: 'academic_class', label: 'Class year', type: 'select', options: optionSets.academicYear },
+    { name: 'batch_session', label: 'Batch / session', placeholder: 'e.g. 2024–2029' },
   ],
   players: [
     { name: 'full_name', label: 'Player full name', required: true, full: true },
     { name: 'student_identifier', label: 'Student ID / identifier' },
     { name: 'photo_url', label: 'Player photo URL', type: 'url' },
-    { name: 'academic_program', label: 'Academic program' },
-    { name: 'current_academic_year', label: 'Academic year', placeholder: 'e.g. Year 2' },
+    { name: 'academic_program', label: 'Academic program', type: 'select', options: optionSets.academicProgram },
+    { name: 'current_academic_year', label: 'Academic year', type: 'select', options: optionSets.academicYear },
+    { name: 'batch_session', label: 'Batch / session', placeholder: 'e.g. 2024–2029' },
     { name: 'height_cm', label: 'Height (cm)', type: 'number' },
     { name: 'position', label: 'Playing position', type: 'select', options: optionSets.position },
     { name: 'preferred_foot', label: 'Preferred foot', type: 'select', options: optionSets.foot },
@@ -267,8 +271,8 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
 
 const pageCopy: Record<RecordKind, { title: string; description: string; table: string; select: string; order: string; columns: string[] }> = {
   competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, name, season, type, format, status, start_date, end_date, is_primary, is_locked', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
-  teams: { title: 'Teams', description: 'Manage university and class teams, then register them in competitions.', table: 'teams', select: 'id, name, short_name, type, academic_class, is_active, is_locked', order: 'name', columns: ['name', 'short_name', 'type', 'academic_class', 'is_active'] },
-  players: { title: 'Players', description: 'Keep one permanent student profile and manage its availability and privacy.', table: 'players', select: 'id, full_name, student_identifier, photo_url, academic_program, current_academic_year, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'student_identifier', 'position', 'injury_status', 'is_available'] },
+  teams: { title: 'Teams', description: 'Manage university and class teams, then register them in competitions.', table: 'teams', select: 'id, name, short_name, type, academic_class, batch_session, is_active, is_locked', order: 'name', columns: ['name', 'short_name', 'type', 'academic_class', 'batch_session', 'is_active'] },
+  players: { title: 'Players', description: 'Edit one permanent student profile used across every team and competition.', table: 'players', select: 'id, full_name, student_identifier, photo_url, academic_program, current_academic_year, batch_session, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'academic_program', 'current_academic_year', 'batch_session', 'position', 'injury_status', 'is_available'] },
   matches: { title: 'Fixtures', description: 'Schedule, publish, and prepare fixtures for the live match centre.', table: 'matches', select: 'id, competition_id, home_team_id, away_team_id, kickoff_at, status, round, venue, referee, published_at, is_locked', order: 'kickoff_at', columns: ['kickoff_at', 'home_team_id', 'away_team_id', 'status'] },
 }
 
@@ -282,6 +286,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   const [teamOptions, setTeamOptions] = useState<Option[]>([])
   const [competitionOptions, setCompetitionOptions] = useState<Option[]>([])
   const [teamRegistration, setTeamRegistration] = useState({ team_id: '', competition_id: '' })
+  const [editingRow, setEditingRow] = useState<Row | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -323,12 +328,22 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     if (kind === 'teams' && text('type') === 'class_team' && !text('academic_class')) { setBusy(false); setError('Enter the class or cohort for this team.'); return }
     if (kind === 'matches' && text('home_team_id') === text('away_team_id')) { setBusy(false); setError('Choose two different teams.'); return }
     const payload = buildPayload(kind, values, universityId, session?.user.id ?? '')
-    const { error: insertError } = await supabase.from(config.table).insert(payload as never).select('id').single()
+    const updatePayload = Object.fromEntries(Object.entries(payload).filter(([key]) => key !== 'created_by'))
+    const saveResult = editingRow && kind === 'players'
+      ? await supabase.from('players').update(updatePayload as never).eq('id', String(editingRow.id)).eq('university_id', universityId).select('id').single()
+      : await supabase.from(config.table).insert(payload as never).select('id').single()
     setBusy(false)
-    if (insertError) { setError(friendlyRecordError(insertError.message)); return }
+    if (saveResult.error) { setError(friendlyRecordError(saveResult.error.message)); return }
     form.reset()
-    setNotice(`${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} added.`)
+    setNotice(editingRow ? 'Player profile updated everywhere this permanent profile is used.' : `${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} added.`)
+    setEditingRow(null)
     await loadRows()
+  }
+
+  function editPlayer(row: Row) {
+    setEditingRow(row)
+    setError('')
+    setNotice('')
   }
 
   async function registerTeam(event: FormEvent<HTMLFormElement>) {
@@ -369,6 +384,29 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     await loadRows()
   }
 
+  async function promoteClassTeam(row: Row) {
+    if (!supabase) return
+    const currentYear = String(row.academic_class ?? '')
+    const nextYear = nextAcademicYear(currentYear)
+    if (!nextYear || row.type !== 'class_team') return
+    const confirmed = confirm(`Promote ${String(row.name)} from ${currentYear} to ${nextYear}? Every active player profile registered to this team will be updated, including their other team and competition records.`)
+    if (!confirmed) return
+
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const { data: updatedCount, error: promotionError } = await supabase.rpc('promote_class_team', { target_team: String(row.id) })
+    setBusy(false)
+    if (promotionError) {
+      setError(promotionError.message.includes('locked')
+        ? 'The team or one of its player profiles is locked by a platform administrator.'
+        : 'The team could not be promoted. Confirm it is an inter-class team with a valid year.')
+      return
+    }
+    setNotice(`${row.name} promoted to ${nextYear}; ${Number(updatedCount ?? 0)} player profiles updated.`)
+    await loadRows()
+  }
+
   const fields = getFields()
   const names = Object.fromEntries(teamOptions.map((option) => [option.value, option.label]))
   const competitions = Object.fromEntries(competitionOptions.map((option) => [option.value, option.label]))
@@ -384,21 +422,22 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
       <div className="secretary-record-layout">
         <section className="secretary-panel secretary-create-panel">
           <div className="secretary-panel-heading">
-            <div><span className="eyebrow">NEW RECORD</span><h2>{kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div>
+            <div><span className="eyebrow">{editingRow ? 'EDIT PERMANENT PROFILE' : 'NEW RECORD'}</span><h2>{editingRow ? 'Edit player profile' : kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div>
             <CircleDot size={17} />
           </div>
-          <form className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
+          <form key={editingRow ? `edit-${String(editingRow.id)}` : `new-${kind}`} className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
             <div className="secretary-field-grid">
               {fields.map((field) => (
                 <label className={field.full ? 'secretary-field secretary-field-full' : 'secretary-field'} key={field.name}>
                   {field.label}
                   {field.options ? (
-                    <select name={field.name} required={field.required}>
+                    <select name={field.name} required={field.required} defaultValue={String(editingRow?.[field.name] ?? '')}>
                       <option value="">Choose {field.label.toLowerCase()}</option>
+                      {Boolean(editingRow?.[field.name]) && !field.options.some((option) => option.value === String(editingRow?.[field.name])) && <option value={String(editingRow?.[field.name])}>{String(editingRow?.[field.name])}</option>}
                       {field.options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
                     </select>
                   ) : (
-                    <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />
+                    <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} defaultValue={String(editingRow?.[field.name] ?? '')} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />
                   )}
                 </label>
               ))}
@@ -406,8 +445,9 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             {kind === 'competitions' && <p className="secretary-form-note">New competitions are saved as drafts. A platform administrator publishes them.</p>}
             {kind === 'matches' && (!teamOptions.length || !competitionOptions.length) && <p className="secretary-form-note">Add at least one competition and two teams before scheduling a fixture.</p>}
             <button className="button button-primary" type="submit" disabled={busy || (kind === 'matches' && (!teamOptions.length || !competitionOptions.length))}>
-              {busy ? 'Saving…' : `Save ${singularLabels[kind]}`}
+              {busy ? 'Saving…' : editingRow ? 'Save player profile' : `Save ${singularLabels[kind]}`}
             </button>
+            {editingRow && <button className="button button-secondary" type="button" disabled={busy} onClick={() => setEditingRow(null)}>Cancel edit</button>}
           </form>
           {kind === 'teams' && <form className="secretary-record-form secretary-team-registration" onSubmit={(event) => void registerTeam(event)}>
             <div className="secretary-panel-heading">
@@ -433,13 +473,15 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             <div className="secretary-table-wrap">
               <table className="secretary-table">
                 <thead>
-                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}</tr>
+                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}{(kind === 'players' || kind === 'teams') && <th>Actions</th>}</tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={String(row.id)}>
                       {config.columns.map((column) => <td key={column}>{formatCell(kind, column, row[column], names, competitions)}</td>)}
                       {kind === 'matches' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button></td>}
+                      {kind === 'players' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => editPlayer(row)}>Edit profile</button></td>}
+                      {kind === 'teams' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked) || !nextAcademicYear(String(row.academic_class ?? ''))} onClick={() => void promoteClassTeam(row)}>{nextAcademicYear(String(row.academic_class ?? '')) ? `Promote to ${nextAcademicYear(String(row.academic_class))}` : row.type === 'class_team' ? 'No next year' : 'University team'}</button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -469,7 +511,7 @@ function buildPayload(kind: RecordKind, values: FormData, universityId: string, 
     points_for_loss: Number(text('points_for_loss') || 0),
     status: 'draft',
   }
-  if (kind === 'teams') return { ...base, name: text('name'), short_name: text('short_name'), type: text('type'), academic_class: text('type') === 'class_team' ? text('academic_class') : null }
+  if (kind === 'teams') return { ...base, name: text('name'), short_name: text('short_name'), type: text('type'), academic_class: text('type') === 'class_team' ? text('academic_class') : null, batch_session: text('batch_session') || null }
   if (kind === 'players') return {
     ...base,
     full_name: text('full_name'),
@@ -477,6 +519,7 @@ function buildPayload(kind: RecordKind, values: FormData, universityId: string, 
     photo_url: text('photo_url') || null,
     academic_program: text('academic_program') || null,
     current_academic_year: text('current_academic_year') || null,
+    batch_session: text('batch_session') || null,
     height_cm: text('height_cm') ? Number(text('height_cm')) : null,
     position: text('position') || null,
     preferred_foot: text('preferred_foot') || null,
@@ -503,4 +546,16 @@ function friendlyRecordError(message: string) {
   if (message.includes('unique') || message.includes('duplicate')) return 'A record with those details already exists.'
   if (message.includes('violates') || message.includes('check constraint')) return 'Some details do not match the required format. Review the form and try again.'
   return 'This record could not be saved. Check your access and try again.'
+}
+
+function nextAcademicYear(value: string) {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^mbbs/, '')
+  const nextYears: Record<string, string> = {
+    year1: 'Year 2', '1styear': 'Year 2', firstyear: 'Year 2',
+    year2: 'Year 3', '2ndyear': 'Year 3', secondyear: 'Year 3',
+    year3: 'Year 4', '3rdyear': 'Year 4', thirdyear: 'Year 4',
+    year4: 'Year 5', '4thyear': 'Year 5', fourthyear: 'Year 5',
+    year5: 'HO', '5thyear': 'HO', fifthyear: 'HO', finalyear: 'HO',
+  }
+  return nextYears[normalized] ?? null
 }
