@@ -125,16 +125,14 @@ export function SecretaryDashboardPage() {
     let active = true
     async function loadDashboard() {
       if (!supabase || !universityId) { setLoading(false); return }
-      const [competitions, teams, players, matchCount, competitionRows, participationRows] = await Promise.all([
-        supabase.from('competitions').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
+      const [competitions, teams, competitionRows, participationRows] = await Promise.all([
+        supabase.from('competitions').select('id', { count: 'exact', head: true }).eq('university_id', universityId).eq('status', 'published'),
         supabase.from('teams').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
-        supabase.from('players').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
-        supabase.from('matches').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
-        supabase.from('competitions').select('id, name').eq('university_id', universityId),
+        supabase.from('competitions').select('id, name, status').eq('university_id', universityId),
         supabase.from('competition_participants').select('competition_id').eq('university_id', universityId).eq('participation_status', 'accepted'),
       ])
       if (!active) return
-      const failed = [competitions, teams, players, matchCount, competitionRows, participationRows].find((result) => result.error)
+      const failed = [competitions, teams, competitionRows, participationRows].find((result) => result.error)
       if (failed?.error) {
         setError(`University data could not be loaded: ${failed.error.message}`)
         setLoading(false)
@@ -145,9 +143,22 @@ export function SecretaryDashboardPage() {
         ...ownCompetitionIds,
         ...(participationRows.data ?? []).map((row) => row.competition_id),
       ])]
-      const upcomingResult = competitionIds.length
-        ? await supabase.from('matches').select('id, home_team_id, away_team_id, competition_id, kickoff_at, status').in('competition_id', competitionIds).gte('kickoff_at', new Date().toISOString()).order('kickoff_at').limit(5)
+      const acceptedExternalIds = [...new Set((participationRows.data ?? [])
+        .map((row) => row.competition_id)
+        .filter((id) => !ownCompetitionIds.includes(id)))]
+      const teamEntriesResult = acceptedExternalIds.length
+        ? await supabase.from('competition_teams').select('competition_id').eq('university_id', universityId).in('competition_id', acceptedExternalIds)
         : { data: [], error: null }
+      if (teamEntriesResult.error) {
+        setError(`Pending team registrations could not be loaded: ${teamEntriesResult.error.message}`)
+        setLoading(false)
+        return
+      }
+      const enteredCompetitionIds = new Set((teamEntriesResult.data ?? []).map((row) => row.competition_id))
+      const pendingRegistrationCount = acceptedExternalIds.filter((id) => !enteredCompetitionIds.has(id)).length
+      const upcomingResult = competitionIds.length
+        ? await supabase.from('matches').select('id, home_team_id, away_team_id, competition_id, kickoff_at, status', { count: 'exact' }).in('competition_id', competitionIds).gte('kickoff_at', new Date().toISOString()).neq('status', 'cancelled').order('kickoff_at').limit(5)
+        : { data: [], count: 0, error: null }
       if (upcomingResult.error) {
         setError(`Upcoming fixtures could not be loaded: ${upcomingResult.error.message}`)
         setLoading(false)
@@ -169,7 +180,7 @@ export function SecretaryDashboardPage() {
         setLoading(false)
         return
       }
-      setCounts([competitions.count ?? 0, teams.count ?? 0, players.count ?? 0, matchCount.count ?? 0])
+      setCounts([competitions.count ?? 0, teams.count ?? 0, upcomingResult.count ?? 0, pendingRegistrationCount])
       setMatches(upcomingRows)
       setTeamNames(Object.fromEntries((teamRows.data ?? []).map((row) => [row.id, row.name])))
       setCompetitionNames(Object.fromEntries([
@@ -183,10 +194,10 @@ export function SecretaryDashboardPage() {
   }, [universityId])
 
   const metrics = [
-    { label: 'Competitions', value: counts[0], icon: Trophy, tone: 'amber', href: '/secretary/competitions' },
+    { label: 'Active competitions', value: counts[0], icon: Trophy, tone: 'amber', href: '/secretary/competitions' },
     { label: 'Registered teams', value: counts[1], icon: Users, tone: 'green', href: '/secretary/teams' },
-    { label: 'Player roster', value: counts[2], icon: GraduationCap, tone: 'blue', href: '/secretary/players' },
-    { label: 'All fixtures', value: counts[3], icon: CalendarDays, tone: 'red', href: '/secretary/matches' },
+    { label: 'Upcoming fixtures', value: counts[2], icon: CalendarDays, tone: 'blue', href: '/secretary/matches' },
+    { label: 'Pending team entries', value: counts[3], icon: Users, tone: 'red', href: '/secretary/leagues' },
   ]
 
   return (
