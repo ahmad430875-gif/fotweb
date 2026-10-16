@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 
 const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim()
 const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+export const initialAuthCallbackType = typeof window === 'undefined'
+  ? null
+  : new URLSearchParams(window.location.hash.slice(1)).get('type')
 
 const hasPlaceholderValue = (value: string) => {
   const normalized = value.trim().toLowerCase()

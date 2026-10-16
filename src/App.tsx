@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import './App.css'
 import { RequireSuperAdmin } from './auth/RequireSuperAdmin'
 import { RequireUniversityAdmin } from './auth/RequireUniversityAdmin'
@@ -6,7 +7,7 @@ import { AdminLayout } from './pages/admin/AdminLayout'
 import { DashboardPage } from './pages/admin/DashboardPage'
 import { LoginPage } from './pages/admin/LoginPage'
 import { UniversityCreatePage, UniversityDetailPage, UniversityListPage } from './pages/admin/UniversityPages'
-import { ResetPasswordPage } from './pages/admin/ResetPasswordPage'
+import { AcceptInvitationPage, ResetPasswordPage } from './pages/admin/ResetPasswordPage'
 import { PublicCompetitionsPage, PublicHomePage, PublicUniversitiesPage } from './pages/PublicPages'
 import { PublicPlayerDetailPage, PublicSquadDetailPage, PublicTeamDetailPage, PublicUniversityDetailPage } from './pages/PublicDetailPages'
 import { CompetitionCentrePage } from './pages/CompetitionCentrePage'
@@ -17,8 +18,17 @@ import { SecretaryDashboardPage, SecretaryLayout, SecretaryRecordsPage } from '.
 import { SecretaryAnnouncementsPage, SecretaryClassTeamsPage, SecretaryLiveMatchPage, SecretarySettingsPage, SecretaryStatisticsPage, SecretaryStandingsPage, SecretaryUniversityTeamPage } from './pages/secretary/SecretaryAdvancedPages'
 import { SecretaryControlCenter } from './pages/secretary/SecretaryControlCenter'
 import { SecretaryLeaguePortal } from './pages/secretary/SecretaryLeaguePortal'
+import { initialAuthCallbackType } from './lib/supabase'
 
 function App() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (initialAuthCallbackType === 'invite' || initialAuthCallbackType === 'recovery') {
+      navigate(initialAuthCallbackType === 'invite' ? '/admin/accept-invitation' : '/admin/reset-password', { replace: true })
+    }
+  }, [navigate])
+
   return (
     <Routes>
       <Route path="/" element={<PublicHomePage />} />
@@ -31,6 +41,7 @@ function App() {
       <Route path="/players/:id" element={<PublicPlayerDetailPage />} />
       <Route path="/squads/:id" element={<PublicSquadDetailPage />} />
       <Route path="/admin/login" element={<LoginPage />} />
+      <Route path="/admin/accept-invitation" element={<AcceptInvitationPage />} />
       <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
       <Route path="/oauth/consent" element={<OAuthConsentPage />} />
 

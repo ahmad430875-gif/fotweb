@@ -105,7 +105,7 @@ Deno.serve(async (request) => {
     const appUrl = getAppOrigin(request)
     if (!appUrl) return respond(500, { error: 'The invitation redirect URL is not configured.' })
     const { data: invitation, error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${appUrl.replace(/\/$/, '')}/admin/reset-password`,
+      redirectTo: appUrl,
       data: { display_name: '' },
     })
     if (inviteError || !invitation.user) return respond(400, { error: 'The invite could not be sent. Check whether this email already has an account.' })
@@ -142,7 +142,7 @@ Deno.serve(async (request) => {
     const appUrl = getAppOrigin(request)
     if (!appUrl) return respond(500, { error: 'The password reset redirect URL is not configured.' })
     const { error } = await service.auth.resetPasswordForEmail(userData.user.email, {
-      redirectTo: `${appUrl.replace(/\/$/, '')}/admin/reset-password`,
+      redirectTo: appUrl,
     })
     if (error) return respond(500, { error: 'The password reset email could not be sent.' })
     await recordAudit(service, caller.id, university.id, 'secretary_password_reset_requested', secretary.id)

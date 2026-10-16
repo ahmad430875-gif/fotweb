@@ -41,7 +41,7 @@ export function LoginPage() {
     setNotice('')
     if (!supabase || !email.trim()) return setError(`Enter your ${oauthReturn ? 'account' : 'administrator'} email first.`)
     setBusy(true)
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/admin/reset-password` })
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin })
     setBusy(false)
     if (resetError) setError('We could not send a reset email. Check the address and try again.')
     else setNotice('If this account exists, a password reset email is on its way.')
