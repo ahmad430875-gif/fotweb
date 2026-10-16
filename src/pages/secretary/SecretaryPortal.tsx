@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDot, GraduationCap, LayoutDashboard, LogOut, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trophy, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDot, GraduationCap, LayoutDashboard, LogOut, MailPlus, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trophy, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { FootballLogo } from '../../components/FootballLogo'
@@ -15,10 +15,12 @@ type MatchRow = { id: string; home_team_id: string; away_team_id: string; compet
 const navigation = [
   { to: '/secretary', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/secretary/team', label: 'University Team', icon: Building2 },
+  { to: '/secretary/class-teams', label: 'Class Teams', icon: GraduationCap },
   { to: '/secretary/players', label: 'Players', icon: GraduationCap },
   { to: '/secretary/announcements', label: 'Squad Announcements', icon: Megaphone },
   { to: '/secretary/news', label: 'News Center', icon: Newspaper },
   { to: '/secretary/competitions', label: 'Competitions', icon: Trophy },
+  { to: '/secretary/leagues', label: 'Leagues & Invitations', icon: MailPlus },
   { to: '/secretary/teams', label: 'All Teams', icon: Users },
   { to: '/secretary/matches', label: 'Fixtures & Results', icon: CalendarDays },
   { to: '/secretary/control-center', label: 'Tournament Control', icon: ShieldCheck },
@@ -96,7 +98,7 @@ export function SecretaryLayout() {
               <Menu size={19} />
             </button>
             <div className="secretary-breadcrumb">
-              <span>University</span><span>/</span><strong>{navigation.find((item) => item.to === location.pathname)?.label ?? (location.pathname === '/secretary/news' ? 'News Center' : 'Operations')}</strong>
+              <span>University</span><span>/</span><strong>{location.pathname.startsWith('/secretary/control-center') ? 'Tournament Control' : navigation.find((item) => item.to === location.pathname)?.label ?? (location.pathname === '/secretary/news' ? 'News Center' : 'Operations')}</strong>
             </div>
           </div>
           <div className="secretary-topbar-actions"><span className="secretary-secure"><i /> University access</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div>
@@ -123,22 +125,57 @@ export function SecretaryDashboardPage() {
     let active = true
     async function loadDashboard() {
       if (!supabase || !universityId) { setLoading(false); return }
-      const [competitions, teams, players, matchCount, upcoming, teamRows, competitionRows] = await Promise.all([
+      const [competitions, teams, players, matchCount, competitionRows, participationRows] = await Promise.all([
         supabase.from('competitions').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
         supabase.from('teams').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
         supabase.from('players').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
         supabase.from('matches').select('id', { count: 'exact', head: true }).eq('university_id', universityId),
-        supabase.from('matches').select('id, home_team_id, away_team_id, competition_id, kickoff_at, status').eq('university_id', universityId).gte('kickoff_at', new Date().toISOString()).order('kickoff_at').limit(5),
-        supabase.from('teams').select('id, name').eq('university_id', universityId),
         supabase.from('competitions').select('id, name').eq('university_id', universityId),
+        supabase.from('competition_participants').select('competition_id').eq('university_id', universityId).eq('participation_status', 'accepted'),
       ])
       if (!active) return
-      const failed = [competitions, teams, players, matchCount, upcoming, teamRows, competitionRows].find((result) => result.error)
-      if (failed?.error) setError('Some university data could not be loaded. Refresh the page to try again.')
+      const failed = [competitions, teams, players, matchCount, competitionRows, participationRows].find((result) => result.error)
+      if (failed?.error) {
+        setError(`University data could not be loaded: ${failed.error.message}`)
+        setLoading(false)
+        return
+      }
+      const ownCompetitionIds = (competitionRows.data ?? []).map((row) => row.id)
+      const competitionIds = [...new Set([
+        ...ownCompetitionIds,
+        ...(participationRows.data ?? []).map((row) => row.competition_id),
+      ])]
+      const upcomingResult = competitionIds.length
+        ? await supabase.from('matches').select('id, home_team_id, away_team_id, competition_id, kickoff_at, status').in('competition_id', competitionIds).gte('kickoff_at', new Date().toISOString()).order('kickoff_at').limit(5)
+        : { data: [], error: null }
+      if (upcomingResult.error) {
+        setError(`Upcoming fixtures could not be loaded: ${upcomingResult.error.message}`)
+        setLoading(false)
+        return
+      }
+      const upcomingRows = (upcomingResult.data ?? []) as MatchRow[]
+      const teamIds = [...new Set(upcomingRows.flatMap((match) => [match.home_team_id, match.away_team_id]))]
+      const additionalCompetitionIds = [...new Set(upcomingRows.map((match) => match.competition_id).filter((id) => !ownCompetitionIds.includes(id)))]
+      const [teamRows, additionalCompetitionRows] = await Promise.all([
+        teamIds.length
+          ? supabase.from('teams').select('id, name').in('id', teamIds)
+          : Promise.resolve({ data: [], error: null }),
+        additionalCompetitionIds.length
+          ? supabase.from('competitions').select('id, name').in('id', additionalCompetitionIds)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+      if (teamRows.error || additionalCompetitionRows.error) {
+        setError(`Fixture details could not be loaded: ${teamRows.error?.message ?? additionalCompetitionRows.error?.message}`)
+        setLoading(false)
+        return
+      }
       setCounts([competitions.count ?? 0, teams.count ?? 0, players.count ?? 0, matchCount.count ?? 0])
-      setMatches((upcoming.data ?? []) as MatchRow[])
+      setMatches(upcomingRows)
       setTeamNames(Object.fromEntries((teamRows.data ?? []).map((row) => [row.id, row.name])))
-      setCompetitionNames(Object.fromEntries((competitionRows.data ?? []).map((row) => [row.id, row.name])))
+      setCompetitionNames(Object.fromEntries([
+        ...(competitionRows.data ?? []),
+        ...(additionalCompetitionRows.data ?? []),
+      ].map((row) => [row.id, row.name])))
       setLoading(false)
     }
     void loadDashboard()
@@ -279,7 +316,9 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   const config = pageCopy[kind]
   const [rows, setRows] = useState<Row[]>([])
   const [teamOptions, setTeamOptions] = useState<Option[]>([])
+  const [managedTeamOptions, setManagedTeamOptions] = useState<Option[]>([])
   const [competitionOptions, setCompetitionOptions] = useState<Option[]>([])
+  const [managedCompetitionOptions, setManagedCompetitionOptions] = useState<Option[]>([])
   const [teamRegistration, setTeamRegistration] = useState({ team_id: '', competition_id: '' })
   const [editingRow, setEditingRow] = useState<Row | null>(null)
   const [loading, setLoading] = useState(true)
@@ -290,6 +329,89 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   async function loadRows() {
     if (!supabase || !universityId) { setLoading(false); return }
     setLoading(true)
+    if (kind === 'matches') {
+      const { data: ownedCompetitions, error: competitionError } = await supabase
+        .from('competitions')
+        .select('id, name')
+        .eq('university_id', universityId)
+        .order('start_date', { ascending: false })
+      if (competitionError) {
+        setRows([])
+        setError(`Competitions could not be loaded: ${competitionError.message}`)
+        setLoading(false)
+        return
+      }
+      const { data: participationRows, error: participationError } = await supabase
+        .from('competition_participants')
+        .select('competition_id')
+        .eq('university_id', universityId)
+        .eq('participation_status', 'accepted')
+      if (participationError) {
+        setRows([])
+        setError(`Accepted competition fixtures could not be loaded: ${participationError.message}`)
+        setLoading(false)
+        return
+      }
+      const ownCompetitionIds = (ownedCompetitions ?? []).map((competition) => competition.id)
+      const externalCompetitionIds = [...new Set((participationRows ?? [])
+        .map((row) => row.competition_id)
+        .filter((id) => !ownCompetitionIds.includes(id)))]
+      const externalCompetitionResult = externalCompetitionIds.length
+        ? await supabase.from('competitions').select('id, name').in('id', externalCompetitionIds)
+        : { data: [], error: null }
+      if (externalCompetitionResult.error) {
+        setRows([])
+        setError(`Accepted competitions could not be loaded: ${externalCompetitionResult.error.message}`)
+        setLoading(false)
+        return
+      }
+      const accessibleCompetitions = [...(ownedCompetitions ?? []), ...(externalCompetitionResult.data ?? [])]
+      const competitionIds = accessibleCompetitions.map((competition) => competition.id)
+      setCompetitionOptions(accessibleCompetitions.map((competition) => ({ label: competition.name, value: competition.id })))
+      setManagedCompetitionOptions((ownedCompetitions ?? []).map((competition) => ({ label: competition.name, value: competition.id })))
+      if (!competitionIds.length) {
+        setRows([])
+        setTeamOptions([])
+        setManagedTeamOptions([])
+        setError('')
+        setLoading(false)
+        return
+      }
+      const [matchResult, entryResult] = await Promise.all([
+        supabase.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, round, venue, referee, published_at, is_locked').in('competition_id', competitionIds).order('kickoff_at'),
+        supabase.from('competition_teams').select('team_id, competition_id').in('competition_id', competitionIds),
+      ])
+      if (matchResult.error || entryResult.error) {
+        setRows([])
+        setError(`Competition fixtures could not be loaded: ${matchResult.error?.message ?? entryResult.error?.message}`)
+        setLoading(false)
+        return
+      }
+      const teamIds = [...new Set([
+        ...(entryResult.data ?? []).map((entry) => entry.team_id),
+        ...(matchResult.data ?? []).flatMap((match) => [match.home_team_id, match.away_team_id]),
+      ])]
+      const teamResult = teamIds.length
+        ? await supabase.from('teams').select('id, name').in('id', teamIds)
+        : { data: [], error: null }
+      if (teamResult.error) {
+        setRows([])
+        setError(`Participating teams could not be loaded: ${teamResult.error.message}`)
+        setLoading(false)
+        return
+      }
+      setTeamOptions((teamResult.data ?? []).map((team) => ({ label: team.name, value: team.id })))
+      const ownedTeamIds = new Set((entryResult.data ?? [])
+        .filter((entry) => ownCompetitionIds.includes(entry.competition_id))
+        .map((entry) => entry.team_id))
+      setManagedTeamOptions((teamResult.data ?? [])
+        .filter((team) => ownedTeamIds.has(team.id))
+        .map((team) => ({ label: team.name, value: team.id })))
+      setRows((matchResult.data ?? []) as unknown as Row[])
+      setError('')
+      setLoading(false)
+      return
+    }
     const { data, error: loadError } = await supabase.from(config.table).select(config.select).eq('university_id', universityId).order(config.order, { ascending: kind === 'teams' || kind === 'players' }).limit(100)
     if (loadError) {
       setRows([])
@@ -297,7 +419,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
         ? 'The database is missing the batch/session fields. Apply migration 202610150003_academic_progression.sql in Supabase, then refresh this page.'
         : `Records could not be loaded: ${loadError.message}`)
     } else { setRows((data ?? []) as unknown as Row[]); setError('') }
-    if (kind === 'matches' || kind === 'teams') {
+    if (kind === 'teams') {
       const [teams, competitions] = await Promise.all([
         supabase.from('teams').select('id, name').eq('university_id', universityId),
         supabase.from('competitions').select('id, name').eq('university_id', universityId),
@@ -313,7 +435,11 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   function getFields() {
     return fieldsByKind[kind].map((field) => ({
       ...field,
-      options: field.name === 'home_team_id' || field.name === 'away_team_id' ? teamOptions : field.name === 'competition_id' ? competitionOptions : field.options,
+      options: field.name === 'home_team_id' || field.name === 'away_team_id'
+        ? kind === 'matches' ? managedTeamOptions : teamOptions
+        : field.name === 'competition_id'
+          ? kind === 'matches' ? managedCompetitionOptions : competitionOptions
+          : field.options,
     }))
   }
 
@@ -424,7 +550,9 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             <div><span className="eyebrow">{editingRow ? 'EDIT PERMANENT PROFILE' : 'NEW RECORD'}</span><h2>{editingRow ? 'Edit player profile' : kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div>
             <CircleDot size={17} />
           </div>
-          <form key={editingRow ? `edit-${String(editingRow.id)}` : `new-${kind}`} className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
+          {kind === 'matches' && !managedCompetitionOptions.length ? (
+            <div className="secretary-empty"><CalendarDays size={20} /><strong>Fixtures are managed by the organizer</strong><span>Accept an invitation to see its fixtures here. The university organizing each league schedules and publishes matches.</span><Link className="button button-secondary" to="/secretary/leagues">Open leagues &amp; invitations</Link></div>
+          ) : <form key={editingRow ? `edit-${String(editingRow.id)}` : `new-${kind}`} className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
             <div className="secretary-field-grid">
               {fields.map((field) => (
                 <label className={field.full ? 'secretary-field secretary-field-full' : 'secretary-field'} key={field.name}>
@@ -447,7 +575,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
               {busy ? 'Saving…' : editingRow ? 'Save player profile' : `Save ${singularLabels[kind]}`}
             </button>
             {editingRow && <button className="button button-secondary" type="button" disabled={busy} onClick={() => setEditingRow(null)}>Cancel edit</button>}
-          </form>
+          </form>}
           {kind === 'teams' && <form className="secretary-record-form secretary-team-registration" onSubmit={(event) => void registerTeam(event)}>
             <div className="secretary-panel-heading">
               <div><span className="eyebrow">COMPETITION ENTRY</span><h2>Register an existing team</h2></div>
@@ -478,7 +606,9 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
                   {rows.map((row) => (
                     <tr key={String(row.id)}>
                       {config.columns.map((column) => <td key={column}>{formatCell(kind, column, row[column], names, competitions)}</td>)}
-                      {kind === 'matches' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button></td>}
+                      {kind === 'matches' && <td>{managedCompetitionOptions.some((option) => option.value === String(row.competition_id))
+                        ? <button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button>
+                        : <span>Organizer controls publication</span>}</td>}
                       {kind === 'players' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => editPlayer(row)}>Edit profile</button></td>}
                       {kind === 'teams' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked) || !nextAcademicYear(String(row.academic_class ?? ''))} onClick={() => void promoteClassTeam(row)}>{nextAcademicYear(String(row.academic_class ?? '')) ? `Promote to ${nextAcademicYear(String(row.academic_class))}` : row.type === 'class_team' ? 'No next year' : 'University team'}</button></td>}
                     </tr>

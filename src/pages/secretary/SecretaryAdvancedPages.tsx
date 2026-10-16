@@ -20,7 +20,7 @@ type Team = {
   is_locked: boolean 
 }
 type Player = { id: string; full_name: string; photo_url: string | null; position: string | null; is_active: boolean }
-type Competition = { id: string; name: string; season: string; status: string; is_locked: boolean }
+type Competition = { id: string; name: string; season: string; status: string; is_locked: boolean; type?: string }
 type Match = { 
   id: string; 
   competition_id: string; 
@@ -34,6 +34,9 @@ type Match = {
   is_locked: boolean 
 }
 type Notice = { kind: 'error' | 'success'; text: string }
+
+type ClassTeamRow = { id: string; name: string; short_name: string; academic_class: string; batch_session: string | null; is_locked: boolean }
+type ClassPlayerRow = { id: string; full_name: string; current_academic_year: string | null; batch_session: string | null }
 
 function Notice({ notice }: { notice: Notice | null }) {
   if (!notice) return null
@@ -53,7 +56,7 @@ export function SecretaryUniversityTeamPage() {
   const [university, setUniversity] = useState<University | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
   const [players, setPlayers] = useState<Player[]>([])
-  const [competitions, setCompetitions] = useState<Competition[]>([])
+  const [competitions, setCompetitions] = useState<Array<Competition & { type: string }>>([])
   const [teamId, setTeamId] = useState('')
   const [roster, setRoster] = useState<Array<{ registrationId: string; player: Player; competition: string; shirt: number | null }>>([])
   const [busy, setBusy] = useState(false)
@@ -74,11 +77,12 @@ export function SecretaryUniversityTeamPage() {
 
   async function load() {
     if (!supabase || !universityId) return
-    const [universityResult, teamResult, playerResult, competitionResult] = await Promise.all([
+    const [universityResult, teamResult, playerResult, competitionResult, participantResult] = await Promise.all([
       supabase.from('universities').select('id, name, short_name').eq('id', universityId).maybeSingle(),
       supabase.from('teams').select('id, name, short_name, logo_url, team_photo_url, season, coach_name, captain_player_id, vice_captain_player_id, type, academic_class, is_locked').eq('university_id', universityId).eq('type', 'university_team').order('created_at'),
       supabase.from('players').select('id, full_name, photo_url, position, is_active').eq('university_id', universityId).eq('is_active', true).order('full_name'),
-      supabase.from('competitions').select('id, name, season, status, is_locked').eq('university_id', universityId).order('start_date', { ascending: false }),
+      supabase.from('competitions').select('id, name, season, status, is_locked, type').eq('university_id', universityId).order('start_date', { ascending: false }),
+      supabase.from('competition_participants').select('competition_id').eq('university_id', universityId).eq('participation_status', 'accepted'),
     ])
 
     if (universityResult.data) setUniversity(universityResult.data as University)
@@ -100,7 +104,18 @@ export function SecretaryUniversityTeamPage() {
       }
     }
     if (playerResult.data) setPlayers(playerResult.data as Player[])
-    if (competitionResult.data) setCompetitions(competitionResult.data as Competition[])
+    if (competitionResult.data) {
+      const ownCompetitions = competitionResult.data as Array<Competition & { type: string }>
+      const participatingIds = [...new Set((participantResult.data ?? []).map((row) => row.competition_id).filter((id) => !ownCompetitions.some((competition) => competition.id === id)))]
+      const participatingResult = participatingIds.length
+        ? await supabase.from('competitions').select('id, name, season, status, is_locked, type').in('id', participatingIds)
+        : { data: [], error: null }
+      if (participatingResult.error) {
+        setNotice({ kind: 'error', text: `Accepted competitions could not be loaded: ${participatingResult.error.message}` })
+      } else {
+        setCompetitions([...ownCompetitions, ...((participatingResult.data ?? []) as Array<Competition & { type: string }>)])
+      }
+    }
   }
 
   async function loadRoster(activeTeamId: string) {
@@ -362,7 +377,7 @@ export function SecretaryUniversityTeamPage() {
                     onChange={(event) => setRegistration((current) => ({ ...current, competition_id: event.target.value }))}
                   >
                     <option value="">Select competition</option>
-                    {competitions.map((competition) => (
+                    {competitions.filter((competition) => competition.type !== 'inter_class').map((competition) => (
                       <option key={competition.id} value={competition.id}>{competition.name} · {competition.season}</option>
                     ))}
                   </select>
@@ -429,10 +444,225 @@ export function SecretaryUniversityTeamPage() {
   )
 }
 
+export function SecretaryClassTeamsPage() {
+  const { profile } = useAuth()
+  const universityId = profile?.university_id
+  const [teams, setTeams] = useState<ClassTeamRow[]>([])
+  const [players, setPlayers] = useState<ClassPlayerRow[]>([])
+  const [competitions, setCompetitions] = useState<Array<Competition & { type: string }>>([])
+  const [teamId, setTeamId] = useState('')
+  const [playerId, setPlayerId] = useState('')
+  const [competitionId, setCompetitionId] = useState('')
+  const [roster, setRoster] = useState<Array<{ id: string; player: ClassPlayerRow; competitionName: string; shirtNumber: number | null }>>([])
+  const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [error, setError] = useState('')
+  const selectedTeam = teams.find((team) => team.id === teamId)
+  const eligiblePlayers = players.filter((player) => normalizeAcademicClass(player.current_academic_year) === normalizeAcademicClass(selectedTeam?.academic_class))
+
+  async function loadBase() {
+    if (!supabase || !universityId) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    const [teamResult, playerResult, hostedCompetitionResult, participationResult] = await Promise.all([
+      supabase.from('teams').select('id, name, short_name, academic_class, batch_session, is_locked').eq('university_id', universityId).eq('type', 'class_team').order('academic_class'),
+      supabase.from('players').select('id, full_name, current_academic_year, batch_session').eq('university_id', universityId).eq('is_active', true).order('full_name'),
+      supabase.from('competitions').select('id, name, season, status, is_locked, type').eq('university_id', universityId).eq('type', 'inter_class').order('start_date', { ascending: false }),
+      supabase.from('competition_participants').select('competition_id').eq('university_id', universityId).eq('participation_status', 'accepted'),
+    ])
+    const failure = [teamResult, playerResult, hostedCompetitionResult, participationResult].find((result) => result.error)
+    if (failure?.error) {
+      setError(`Class teams could not be loaded: ${failure.error.message}`)
+      setLoading(false)
+      return
+    }
+    const ownCompetitions = (hostedCompetitionResult.data ?? []) as Array<Competition & { type: string }>
+    const externalIds = [...new Set((participationResult.data ?? []).map((row) => row.competition_id).filter((id) => !ownCompetitions.some((competition) => competition.id === id)))]
+    const externalResult = externalIds.length
+      ? await supabase.from('competitions').select('id, name, season, status, is_locked, type').in('id', externalIds).eq('type', 'inter_class')
+      : { data: [], error: null }
+    if (externalResult.error) {
+      setError(`Accepted inter-class competitions could not be loaded: ${externalResult.error.message}`)
+      setLoading(false)
+      return
+    }
+    const competitionRows = [...ownCompetitions, ...((externalResult.data ?? []) as Array<Competition & { type: string }>)]
+    setTeams((teamResult.data ?? []) as ClassTeamRow[])
+    setPlayers((playerResult.data ?? []) as ClassPlayerRow[])
+    setCompetitions(competitionRows)
+    setTeamId((current) => (teamResult.data ?? []).some((team) => team.id === current) ? current : teamResult.data?.[0]?.id ?? '')
+    setCompetitionId((current) => competitionRows.some((competition) => competition.id === current) ? current : competitionRows[0]?.id ?? '')
+    setLoading(false)
+  }
+
+  async function loadRoster(activeTeamId: string) {
+    if (!supabase || !universityId || !activeTeamId) {
+      setRoster([])
+      return
+    }
+    const { data: registrationRows, error: registrationError } = await supabase.from('player_registrations')
+      .select('id, player_id, competition_id, shirt_number')
+      .eq('team_id', activeTeamId)
+      .eq('university_id', universityId)
+      .is('released_at', null)
+      .order('registered_at')
+    if (registrationError) {
+      setError(`Class roster could not be loaded: ${registrationError.message}`)
+      return
+    }
+    if (!registrationRows?.length) {
+      setRoster([])
+      return
+    }
+    const [playerResult, competitionResult] = await Promise.all([
+      supabase.from('players').select('id, full_name, current_academic_year, batch_session').in('id', registrationRows.map((row) => row.player_id)),
+      supabase.from('competitions').select('id, name, season').in('id', [...new Set(registrationRows.map((row) => row.competition_id))]),
+    ])
+    if (playerResult.error || competitionResult.error) {
+      setError(`Class roster details could not be loaded: ${playerResult.error?.message ?? competitionResult.error?.message}`)
+      return
+    }
+    const playerMap = new Map(((playerResult.data ?? []) as ClassPlayerRow[]).map((player) => [player.id, player]))
+    const competitionMap = new Map((competitionResult.data ?? []).map((competition) => [competition.id, `${competition.name} · ${competition.season}`]))
+    setRoster(registrationRows.flatMap((row) => {
+      const player = playerMap.get(row.player_id)
+      return player ? [{ id: row.id, player, competitionName: competitionMap.get(row.competition_id) ?? 'Competition', shirtNumber: row.shirt_number }] : []
+    }))
+  }
+
+  useEffect(() => { void loadBase() }, [universityId])
+  useEffect(() => { void loadRoster(teamId) }, [teamId, universityId])
+
+  async function createClassTeam(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!supabase || !universityId) return
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
+    const name = String(form.get('team-name') ?? '').trim()
+    const shortName = String(form.get('short-name') ?? '').trim()
+    const academicClass = String(form.get('academic-class') ?? '').trim()
+    if (!name || !shortName || !academicClass) return
+    setBusy(true)
+    setError('')
+    setNotice(null)
+    const { data, error: createError } = await supabase.from('teams').insert({
+      university_id: universityId,
+      name,
+      short_name: shortName,
+      type: 'class_team',
+      academic_class: academicClass,
+    }).select('id').single()
+    setBusy(false)
+    if (createError) {
+      setError(`Class team could not be created: ${createError.message}`)
+      return
+    }
+    setNotice({ kind: 'success', text: `${academicClass} team created. Only players with that academic year will appear in its roster.` })
+    setTeamId(data.id)
+    formElement.reset()
+    await loadBase()
+  }
+
+  async function registerClassPlayer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!supabase || !universityId || !selectedTeam || !competitionId || !playerId) return
+    setBusy(true)
+    setError('')
+    setNotice(null)
+    const { error: membershipError } = await supabase.from('competition_teams').upsert({
+      competition_id: competitionId,
+      team_id: selectedTeam.id,
+      university_id: universityId,
+    }, { onConflict: 'competition_id,team_id' })
+    if (membershipError) {
+      setBusy(false)
+      setError(`Class team could not be entered in the inter-class competition: ${membershipError.message}`)
+      return
+    }
+    const { error: registrationError } = await supabase.from('player_registrations').insert({
+      player_id: playerId,
+      team_id: selectedTeam.id,
+      competition_id: competitionId,
+      university_id: universityId,
+    })
+    setBusy(false)
+    if (registrationError) {
+      setError(registrationError.message.includes('academic year')
+        ? 'Player academic year does not match this class team.'
+        : `Player could not be registered: ${registrationError.message}`)
+      return
+    }
+    setNotice({ kind: 'success', text: 'Player registered to the class team for this inter-class competition.' })
+    setPlayerId('')
+    await loadRoster(selectedTeam.id)
+  }
+
+  async function releaseClassPlayer(registrationId: string) {
+    if (!supabase || !confirm('Release this player from the class-team competition roster?')) return
+    const { error: releaseError } = await supabase.from('player_registrations').update({ released_at: new Date().toISOString() }).eq('id', registrationId)
+    if (releaseError) {
+      setError(`Player could not be released: ${releaseError.message}`)
+      return
+    }
+    if (selectedTeam) await loadRoster(selectedTeam.id)
+  }
+
+  return (
+    <section className="secretary-record-page">
+      <div className="secretary-heading"><div><span className="eyebrow">INTER-CLASS FOOTBALL</span><h1>Class teams &amp; rosters</h1><p>Build a team for each academic class. Player eligibility is matched to the permanent academic year in their student profile.</p></div></div>
+      {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
+      <Notice notice={notice} />
+      <div className="secretary-record-layout">
+        <section className="secretary-panel secretary-create-panel">
+          <div className="secretary-panel-heading"><div><span className="eyebrow">TEAM SETUP</span><h2>Create a class team</h2></div><Users size={17} /></div>
+          <p className="secretary-form-note">Examples: MBBS Year 1 FC or DPT Year 3 FC. Choose the same academic-year label used in player profiles.</p>
+          <form className="secretary-record-form" onSubmit={(event) => void createClassTeam(event)}>
+            <div className="secretary-field-grid">
+              <label className="secretary-field">Team name<input name="team-name" required minLength={2} placeholder="e.g. MBBS Year 1 FC" /></label>
+              <label className="secretary-field">Short name<input name="short-name" required minLength={2} placeholder="e.g. MBBS Y1" /></label>
+              <label className="secretary-field secretary-field-full">Academic class<input name="academic-class" required minLength={2} list="class-academic-years" placeholder="Use the same label as player profiles, e.g. MBBS Year 1" /><datalist id="class-academic-years">{['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', '1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', 'HO', 'PGr'].map((year) => <option key={year} value={year} />)}</datalist></label>
+            </div>
+            <button className="button button-primary" type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create class team'}</button>
+          </form>
+          <div className="secretary-panel-heading class-team-select-heading"><div><span className="eyebrow">YOUR CLASS TEAMS</span><h2>Select a team</h2></div><span className="secretary-list-count">{teams.length}</span></div>
+          {loading ? <div className="secretary-empty">Loading class teams…</div> : teams.length ? (
+            <div className="class-team-picker">{teams.map((team) => <button key={team.id} className={team.id === teamId ? 'class-team-option class-team-option-active' : 'class-team-option'} type="button" onClick={() => setTeamId(team.id)}><strong>{team.name}</strong><span>{team.academic_class}{team.is_locked ? ' · Locked' : ''}</span></button>)}</div>
+          ) : <div className="secretary-empty">Create your first class team to start a roster.</div>}
+        </section>
+        <section className="secretary-panel secretary-list-panel">
+          <div className="secretary-panel-heading"><div><span className="eyebrow">ACADEMIC-YEAR ELIGIBILITY</span><h2>{selectedTeam?.name ?? 'Select a class team'}</h2></div><span className="secretary-list-count">{eligiblePlayers.length} eligible</span></div>
+          {selectedTeam ? (
+            <>
+              <p className="secretary-form-note">Eligible players must have <strong>{selectedTeam.academic_class}</strong> as their current academic year. Their permanent university profile remains owned by your university.</p>
+              <form className="secretary-record-form" onSubmit={(event) => void registerClassPlayer(event)}>
+                <div className="secretary-field-grid">
+                  <label className="secretary-field">Inter-class competition<select required value={competitionId} onChange={(event) => setCompetitionId(event.target.value)}><option value="">Choose competition</option>{competitions.map((competition) => <option key={competition.id} value={competition.id}>{competition.name} · {competition.season}</option>)}</select></label>
+                  <label className="secretary-field">Eligible player<select required value={playerId} onChange={(event) => setPlayerId(event.target.value)}><option value="">Choose player · {eligiblePlayers.length} eligible</option>{eligiblePlayers.map((player) => <option key={player.id} value={player.id}>{player.full_name}{player.batch_session ? ` · ${player.batch_session}` : ''}</option>)}</select></label>
+                </div>
+                {!competitions.length && <p className="secretary-form-note">Create an inter-class competition or accept an inter-class invitation in Leagues &amp; invitations before entering this team.</p>}
+                <button className="button button-primary" type="submit" disabled={busy || !eligiblePlayers.length || !competitionId}>{busy ? 'Adding…' : 'Add player to competition roster'}</button>
+              </form>
+              <div className="secretary-panel-heading class-team-roster-heading"><div><span className="eyebrow">REGISTERED PLAYERS</span><h2>Competition rosters</h2></div><span className="secretary-list-count">{roster.length}</span></div>
+              {roster.length ? <div className="secretary-table-wrap"><table className="secretary-table"><thead><tr><th>Player</th><th>Academic year</th><th>Competition</th><th>Action</th></tr></thead><tbody>{roster.map((row) => <tr key={row.id}><td>{row.player.full_name}</td><td>{row.player.current_academic_year ?? '—'}</td><td>{row.competitionName}</td><td><button className="secretary-text-action" type="button" onClick={() => void releaseClassPlayer(row.id)}>Remove</button></td></tr>)}</tbody></table></div> : <div className="secretary-empty">No active class-team registrations yet.</div>}
+            </>
+          ) : <div className="secretary-empty">Select or create a class team to manage its competition rosters.</div>}
+        </section>
+      </div>
+    </section>
+  )
+}
+
+function normalizeAcademicClass(value: string | null | undefined) {
+  return (value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^mbbs/, '')
+}
+
 export function SecretaryAnnouncementsPage() {
   const { profile, session } = useAuth()
   const universityId = profile?.university_id
-  const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([])
+  const [teams, setTeams] = useState<Array<{ id: string; name: string; type: string }>>([])
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [matches, setMatches] = useState<Match[]>([])
   const [roster, setRoster] = useState<Array<Player & { shirt_number: number | null }>>([])
@@ -447,16 +677,39 @@ export function SecretaryAnnouncementsPage() {
   const [goalkeeperId, setGoalkeeperId] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const selectedTeamRow = teams.find((team) => team.id === selectedTeam)
+  const eligibleCompetitions = competitions.filter((competition) => selectedTeamRow
+    ? (selectedTeamRow.type === 'class_team') === (competition.type === 'inter_class')
+    : true)
+  const eligibleTeams = teams.filter((team) => {
+    const competition = competitions.find((row) => row.id === selectedCompetition)
+    return !competition || (team.type === 'class_team') === (competition.type === 'inter_class')
+  })
 
   async function loadBase() {
     if (!supabase || !universityId) return
-    const [teamRows, competitionRows, announcementRows] = await Promise.all([
-      supabase.from('teams').select('id, name').eq('university_id', universityId).eq('is_active', true).order('name'),
-      supabase.from('competitions').select('id, name, season, status, is_locked').eq('university_id', universityId).order('start_date', { ascending: false }),
+    const [teamRows, competitionRows, announcementRows, participationRows] = await Promise.all([
+      supabase.from('teams').select('id, name, type').eq('university_id', universityId).eq('is_active', true).order('name'),
+      supabase.from('competitions').select('id, name, season, status, is_locked, type').eq('university_id', universityId).order('start_date', { ascending: false }),
       supabase.from('squad_announcements').select('id, title, is_published, formation, team_id, competition_id, created_at').eq('university_id', universityId).order('created_at', { ascending: false }).limit(30),
+      supabase.from('competition_participants').select('competition_id').eq('university_id', universityId).eq('participation_status', 'accepted'),
     ])
+    const failure = [teamRows, competitionRows, announcementRows, participationRows].find((result) => result.error)
+    if (failure?.error) {
+      setNotice({ kind: 'error', text: `Squad workspace could not be loaded: ${failure.error.message}` })
+      return
+    }
+    const ownCompetitions = competitionRows.data ?? []
+    const additionalIds = [...new Set((participationRows.data ?? []).map((row) => row.competition_id).filter((id) => !ownCompetitions.some((competition) => competition.id === id)))]
+    const additionalRows = additionalIds.length
+      ? await supabase.from('competitions').select('id, name, season, status, is_locked, type').in('id', additionalIds)
+      : { data: [], error: null }
+    if (additionalRows.error) {
+      setNotice({ kind: 'error', text: `Accepted competitions could not be loaded: ${additionalRows.error.message}` })
+      return
+    }
     setTeams(teamRows.data ?? [])
-    setCompetitions((competitionRows.data ?? []) as Competition[])
+    setCompetitions([...ownCompetitions, ...((additionalRows.data ?? []) as Competition[])])
     setAnnouncements(announcementRows.data ?? [])
   }
 
@@ -471,16 +724,24 @@ export function SecretaryAnnouncementsPage() {
       }
       const [registrationRows, matchRows] = await Promise.all([
         supabase.from('player_registrations').select('player_id, shirt_number').eq('university_id', universityId).eq('team_id', selectedTeam).eq('competition_id', selectedCompetition).is('released_at', null),
-        supabase.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, published_at, is_locked').eq('university_id', universityId).eq('competition_id', selectedCompetition).order('kickoff_at'),
+        supabase.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, published_at, is_locked').eq('competition_id', selectedCompetition).order('kickoff_at'),
       ])
       if (!active) return
+      if (registrationRows.error || matchRows.error) {
+        setNotice({ kind: 'error', text: `Squad roster could not be loaded: ${registrationRows.error?.message ?? matchRows.error?.message}` })
+        return
+      }
       setMatches((matchRows.data ?? []) as Match[])
       if (!registrationRows.data?.length) { 
         setRoster([])
         return 
       }
       const ids = registrationRows.data.map((registrationRow) => registrationRow.player_id)
-      const { data } = await supabase.from('players').select('id, full_name, photo_url, position, is_active').in('id', ids).eq('is_active', true).order('full_name')
+      const { data, error: playerError } = await supabase.from('players').select('id, full_name, photo_url, position, is_active').in('id', ids).eq('is_active', true).order('full_name')
+      if (playerError) {
+        setNotice({ kind: 'error', text: `Registered players could not be loaded: ${playerError.message}` })
+        return
+      }
       const numbers = new Map(registrationRows.data.map((registrationRow) => [registrationRow.player_id, registrationRow.shirt_number]))
       setRoster((data ?? []).map((player) => ({ ...(player as Player), shirt_number: numbers.get(player.id) ?? null })))
     }
@@ -518,7 +779,8 @@ export function SecretaryAnnouncementsPage() {
     setBusy(true)
     setNotice(null)
 
-    const form = new FormData(event.currentTarget)
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
     const title = String(form.get('title') ?? '').trim()
     const description = String(form.get('description') ?? '').trim()
     const formation = String(form.get('formation') ?? '4-3-3')
@@ -592,7 +854,7 @@ export function SecretaryAnnouncementsPage() {
     setCaptainId('')
     setViceCaptainId('')
     setGoalkeeperId('')
-    ;(event.currentTarget as HTMLFormElement).reset()
+    formElement.reset()
     await loadBase()
   }
 
@@ -637,13 +899,20 @@ export function SecretaryAnnouncementsPage() {
                   required 
                   value={selectedTeam} 
                   onChange={(event) => { 
-                    setSelectedTeam(event.target.value) 
+                    const nextTeamId = event.target.value
+                    const nextTeam = teams.find((team) => team.id === nextTeamId)
+                    const competition = competitions.find((row) => row.id === selectedCompetition)
+                    setSelectedTeam(nextTeamId)
+                    if (nextTeam && competition && (nextTeam.type === 'class_team') !== (competition.type === 'inter_class')) {
+                      setSelectedCompetition('')
+                      setSelectedMatch('')
+                    }
                     setStarters([]) 
                     setSubstitutes([]) 
                   }}
                 >
                   <option value="">Select team</option>
-                  {teams.map((team) => (
+                  {eligibleTeams.map((team) => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
                 </select>
@@ -655,14 +924,20 @@ export function SecretaryAnnouncementsPage() {
                   required 
                   value={selectedCompetition} 
                   onChange={(event) => { 
-                    setSelectedCompetition(event.target.value) 
+                    const nextCompetitionId = event.target.value
+                    const competition = competitions.find((row) => row.id === nextCompetitionId)
+                    const team = teams.find((row) => row.id === selectedTeam)
+                    setSelectedCompetition(nextCompetitionId)
+                    if (competition && team && (team.type === 'class_team') !== (competition.type === 'inter_class')) {
+                      setSelectedTeam('')
+                    }
                     setSelectedMatch('') 
                     setStarters([]) 
                     setSubstitutes([]) 
                   }}
                 >
                   <option value="">Select competition</option>
-                  {competitions.map((competition) => (
+                  {eligibleCompetitions.map((competition) => (
                     <option key={competition.id} value={competition.id}>{competition.name} · {competition.season}</option>
                   ))}
                 </select>
@@ -864,7 +1139,6 @@ export function SecretaryLiveMatchPage() {
     const { data, error } = await supabase
       .from('matches')
       .select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, published_at, is_locked')
-      .eq('university_id', universityId)
       .in('status', ['scheduled', 'warm_up', 'live', 'half_time'])
       .order('kickoff_at')
 

@@ -102,6 +102,14 @@ This repository also includes a set of admin and secretary pages gated by role-b
 
 ### Institutional tournament control center
 
-The secretary portal's **Tournament Control** page (`/secretary/control-center`) manages competition stages, rounds, bracket fixtures and progression links, squad announcement locks, card records, player eligibility, match venues, referees, and venue supervisors. Its tables and university-scoped secretary RLS policies are created by `supabase/migrations/202610160001_institutional_tournament_control.sql`; apply pending migrations with the Supabase CLI before using the page.
+The secretary portal's **Tournament Control** workspace (`/secretary/control-center`) guides secretaries through separate pages for tournament structure, fixtures and bracket progression, squad announcement locks, discipline and player eligibility, and venue and officials. Its schema starts in `supabase/migrations/202610160001_institutional_tournament_control.sql`; the follow-up `supabase/migrations/202610160002_multi_university_competitions.sql` adds organizer invitations, university participation, and cross-university team access. Apply both pending migrations with the Supabase CLI before using the workspace.
 
 Player eligibility is fail-closed until academic enrollment is confirmed. In **Secretary → Players**, set **Academic enrollment** to **Actively enrolled** and record the student's **Batch / session**. The check also requires an active player profile and an unreleased registration for the selected competition, and blocks players with an unserved red-card record. Mark a red-card suspension served from the control center to restore eligibility.
+
+### University competitions and inter-class teams
+
+Each competition belongs to its organizing university. From **Secretary → Leagues & Invitations**, the organizer invites participating universities; each invited university accepts in its own portal and enters its own team. The organizer controls the competition and fixture publication, while each participant controls its permanent player profiles, registrations, and squad announcements.
+
+Create university squads in **University Team**. For campus sports-week tournaments, create separate **Class Teams** and use an academic-year label matching the players' permanent profiles; the database also enforces this rule when registrations or academic years change. Inter-class competitions accept class teams, while other competition types accept university teams.
+
+Fixtures have one shared database record: bracket changes are synchronized with the existing `matches` records used by public fixtures, results, events, and statistics. Public React pages are unchanged. Publish an organizer's fixture from **Fixtures & Results** when it is ready to appear on public pages.

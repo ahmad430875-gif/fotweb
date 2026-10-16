@@ -14,8 +14,9 @@ import { MatchDetailPage } from './pages/MatchDetailPage'
 import { OAuthConsentPage } from './pages/OAuthConsentPage'
 import { NewsManagementPage } from './pages/admin/NewsManagementPage'
 import { SecretaryDashboardPage, SecretaryLayout, SecretaryRecordsPage } from './pages/secretary/SecretaryPortal'
-import { SecretaryAnnouncementsPage, SecretaryLiveMatchPage, SecretarySettingsPage, SecretaryStatisticsPage, SecretaryStandingsPage, SecretaryUniversityTeamPage } from './pages/secretary/SecretaryAdvancedPages'
+import { SecretaryAnnouncementsPage, SecretaryClassTeamsPage, SecretaryLiveMatchPage, SecretarySettingsPage, SecretaryStatisticsPage, SecretaryStandingsPage, SecretaryUniversityTeamPage } from './pages/secretary/SecretaryAdvancedPages'
 import { SecretaryControlCenter } from './pages/secretary/SecretaryControlCenter'
+import { SecretaryLeaguePortal } from './pages/secretary/SecretaryLeaguePortal'
 
 function App() {
   return (
@@ -37,12 +38,14 @@ function App() {
         <Route path="/secretary" element={<SecretaryLayout />}>
           <Route index element={<SecretaryDashboardPage />} />
           <Route path="team" element={<SecretaryUniversityTeamPage />} />
+          <Route path="class-teams" element={<SecretaryClassTeamsPage />} />
           <Route path="announcements" element={<SecretaryAnnouncementsPage />} />
+          <Route path="leagues" element={<SecretaryLeaguePortal />} />
           <Route path="competitions" element={<SecretaryRecordsPage kind="competitions" />} />
           <Route path="teams" element={<SecretaryRecordsPage kind="teams" />} />
           <Route path="players" element={<SecretaryRecordsPage kind="players" />} />
           <Route path="matches" element={<SecretaryRecordsPage kind="matches" />} />
-          <Route path="control-center" element={<SecretaryControlCenter />} />
+          <Route path="control-center/*" element={<SecretaryControlCenter />} />
           <Route path="news" element={<NewsManagementPage scope="university" />} />
           <Route path="live" element={<SecretaryLiveMatchPage />} />
           <Route path="standings" element={<SecretaryStandingsPage />} />
