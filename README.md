@@ -99,3 +99,9 @@ npm run preview
 ---
 
 This repository also includes a set of admin and secretary pages gated by role-based access controls, so a valid Supabase session and user profile are required for those flows to work properly.
+
+### Institutional tournament control center
+
+The secretary portal's **Tournament Control** page (`/secretary/control-center`) manages competition stages, rounds, bracket fixtures and progression links, squad announcement locks, card records, player eligibility, match venues, referees, and venue supervisors. Its tables and university-scoped secretary RLS policies are created by `supabase/migrations/202610160001_institutional_tournament_control.sql`; apply pending migrations with the Supabase CLI before using the page.
+
+Player eligibility is fail-closed until academic enrollment is confirmed. In **Secretary → Players**, set **Academic enrollment** to **Actively enrolled** and record the student's **Batch / session**. The check also requires an active player profile and an unreleased registration for the selected competition, and blocks players with an unserved red-card record. Mark a red-card suspension served from the control center to restore eligibility.

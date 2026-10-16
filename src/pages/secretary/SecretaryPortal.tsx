@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDot, GraduationCap, LayoutDashboard, LogOut, Megaphone, Menu, Newspaper, Radio, Settings, Table2, Trophy, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDot, GraduationCap, LayoutDashboard, LogOut, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trophy, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { FootballLogo } from '../../components/FootballLogo'
@@ -21,6 +21,7 @@ const navigation = [
   { to: '/secretary/competitions', label: 'Competitions', icon: Trophy },
   { to: '/secretary/teams', label: 'All Teams', icon: Users },
   { to: '/secretary/matches', label: 'Fixtures & Results', icon: CalendarDays },
+  { to: '/secretary/control-center', label: 'Tournament Control', icon: ShieldCheck },
   { to: '/secretary/live', label: 'Live Match Centre', icon: Radio },
   { to: '/secretary/standings', label: 'Standings', icon: Table2 },
   { to: '/secretary/statistics', label: 'Statistics', icon: BarChart3 },
@@ -215,6 +216,7 @@ const optionSets: Record<string, Option[]> = {
   injury: [{ label: 'Fit', value: 'fit' }, { label: 'Injured', value: 'injured' }, { label: 'Recovering', value: 'recovering' }],
   availability: [{ label: 'Available', value: 'true' }, { label: 'Unavailable', value: 'false' }],
   visibility: [{ label: 'Keep private', value: 'false' }, { label: 'Show publicly', value: 'true' }],
+  enrollmentStatus: [{ label: 'Inactive / not confirmed', value: 'inactive' }, { label: 'Actively enrolled', value: 'active' }],
 }
 
 const fieldsByKind: Record<RecordKind, Field[]> = {
@@ -244,6 +246,7 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
     { name: 'academic_program', label: 'Academic program', type: 'select', options: optionSets.academicProgram },
     { name: 'current_academic_year', label: 'Academic year', type: 'select', options: optionSets.academicYear },
     { name: 'batch_session', label: 'Batch / session', placeholder: 'e.g. 2024–2029' },
+    { name: 'academic_enrollment_status', label: 'Academic enrollment', type: 'select', options: optionSets.enrollmentStatus, required: true },
     { name: 'height_cm', label: 'Height (cm)', type: 'number' },
     { name: 'position', label: 'Playing position', type: 'select', options: optionSets.position },
     { name: 'preferred_foot', label: 'Preferred foot', type: 'select', options: optionSets.foot },
@@ -264,7 +267,7 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
 const pageCopy: Record<RecordKind, { title: string; description: string; table: string; select: string; order: string; columns: string[] }> = {
   competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, name, season, type, format, status, start_date, end_date, is_primary, is_locked', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
   teams: { title: 'Teams', description: 'Manage university and class teams, then register them in competitions.', table: 'teams', select: 'id, name, short_name, type, academic_class, batch_session, is_active, is_locked', order: 'name', columns: ['name', 'short_name', 'type', 'academic_class', 'batch_session', 'is_active'] },
-  players: { title: 'Players', description: 'Edit one permanent student profile used across every team and competition.', table: 'players', select: 'id, full_name, student_identifier, photo_url, academic_program, current_academic_year, batch_session, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'academic_program', 'current_academic_year', 'batch_session', 'position', 'injury_status', 'is_available'] },
+  players: { title: 'Players', description: 'Edit one permanent student profile used across every team and competition.', table: 'players', select: 'id, full_name, student_identifier, photo_url, academic_program, current_academic_year, batch_session, academic_enrollment_status, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'academic_program', 'current_academic_year', 'batch_session', 'academic_enrollment_status', 'position', 'injury_status', 'is_available'] },
   matches: { title: 'Fixtures', description: 'Schedule, publish, and prepare fixtures for the live match centre.', table: 'matches', select: 'id, competition_id, home_team_id, away_team_id, kickoff_at, status, round, venue, referee, published_at, is_locked', order: 'kickoff_at', columns: ['kickoff_at', 'home_team_id', 'away_team_id', 'status'] },
 }
 
@@ -516,6 +519,7 @@ function buildPayload(kind: RecordKind, values: FormData, universityId: string, 
     academic_program: text('academic_program') || null,
     current_academic_year: text('current_academic_year') || null,
     batch_session: text('batch_session') || null,
+    academic_enrollment_status: text('academic_enrollment_status') || 'inactive',
     height_cm: text('height_cm') ? Number(text('height_cm')) : null,
     position: text('position') || null,
     preferred_foot: text('preferred_foot') || null,

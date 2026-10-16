@@ -15,6 +15,7 @@ import { OAuthConsentPage } from './pages/OAuthConsentPage'
 import { NewsManagementPage } from './pages/admin/NewsManagementPage'
 import { SecretaryDashboardPage, SecretaryLayout, SecretaryRecordsPage } from './pages/secretary/SecretaryPortal'
 import { SecretaryAnnouncementsPage, SecretaryLiveMatchPage, SecretarySettingsPage, SecretaryStatisticsPage, SecretaryStandingsPage, SecretaryUniversityTeamPage } from './pages/secretary/SecretaryAdvancedPages'
+import { SecretaryControlCenter } from './pages/secretary/SecretaryControlCenter'
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
           <Route path="teams" element={<SecretaryRecordsPage kind="teams" />} />
           <Route path="players" element={<SecretaryRecordsPage kind="players" />} />
           <Route path="matches" element={<SecretaryRecordsPage kind="matches" />} />
+          <Route path="control-center" element={<SecretaryControlCenter />} />
           <Route path="news" element={<NewsManagementPage scope="university" />} />
           <Route path="live" element={<SecretaryLiveMatchPage />} />
           <Route path="standings" element={<SecretaryStandingsPage />} />
