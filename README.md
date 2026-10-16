@@ -70,6 +70,19 @@ If you need TypeScript types for the local schema:
 npm run db:types
 ```
 
+### Apply database migrations to a hosted Supabase project
+
+Player, team, and competition saves require the database schema and access policies in this repository's migrations. From the repository root, use the Supabase CLI to apply migrations that are pending for the linked project:
+
+```bash
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase migration list
+npx supabase db push
+```
+
+Replace `YOUR_PROJECT_REF` with the project reference shown in the Supabase project URL. Review the migration list before pushing. If migrations were previously run manually in the Supabase SQL Editor, do not blindly run the SQL files again or push untracked migrations; first reconcile the project's migration history with the database.
+
 5) Build and preview checks
 
 ```bash

@@ -329,7 +329,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
       ? await supabase.from('players').update(updatePayload as never).eq('id', String(editingRow.id)).eq('university_id', universityId).select('id').single()
       : await supabase.from(config.table).insert(payload as never).select('id').single()
     setBusy(false)
-    if (saveResult.error) { setError(friendlyRecordError(saveResult.error.message)); return }
+    if (saveResult.error) { setError(friendlyRecordError(saveResult.error)); return }
     form.reset()
     setNotice(editingRow ? 'Player profile updated everywhere this permanent profile is used.' : `${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} added.`)
     setEditingRow(null)
@@ -355,7 +355,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     }, { onConflict: 'competition_id,team_id' })
     setBusy(false)
     if (registrationError) {
-      setError(friendlyRecordError(registrationError.message))
+      setError(friendlyRecordError(registrationError))
       return
     }
     setTeamRegistration({ team_id: '', competition_id: '' })
@@ -538,10 +538,31 @@ function formatCell(kind: RecordKind, column: string, value: unknown, teams: Rec
   return String(value).replaceAll('_', ' ')
 }
 
-function friendlyRecordError(message: string) {
-  if (message.includes('unique') || message.includes('duplicate')) return 'A record with those details already exists.'
-  if (message.includes('violates') || message.includes('check constraint')) return 'Some details do not match the required format. Review the form and try again.'
-  return 'This record could not be saved. Check your access and try again.'
+function friendlyRecordError(error: { code?: string; message: string }) {
+  const message = error.message
+  const normalizedMessage = message.toLowerCase()
+  const diagnostic = `Supabase${error.code ? ` (${error.code})` : ''}: ${message}`
+
+  if (error.code === '23505' || normalizedMessage.includes('unique') || normalizedMessage.includes('duplicate')) {
+    return `A record with those details already exists. ${diagnostic}`
+  }
+  if (error.code === '23514' || normalizedMessage.includes('check constraint')) {
+    return `Some details do not match the required format. Review the form. ${diagnostic}`
+  }
+  if (error.code === '42501' || normalizedMessage.includes('row-level security') || normalizedMessage.includes('permission denied')) {
+    return `Supabase denied this save. Confirm your account is an active administrator for this university, then sign out and back in to refresh your access. ${diagnostic}`
+  }
+  if (
+    error.code === '42703' ||
+    error.code === '42P01' ||
+    error.code === 'PGRST204' ||
+    error.code === 'PGRST205' ||
+    normalizedMessage.includes('schema cache') ||
+    normalizedMessage.includes('does not exist')
+  ) {
+    return `The Supabase database schema is missing or out of date. Apply all pending migrations from supabase/migrations, then retry. ${diagnostic}`
+  }
+  return `This record could not be saved. ${diagnostic}`
 }
 
 function nextAcademicYear(value: string) {
