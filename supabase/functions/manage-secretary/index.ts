@@ -26,7 +26,8 @@ function getAppOrigin(request: Request) {
   if (!value) return null
   try {
     const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : null
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return `${url.origin}${url.pathname.replace(/\/+$/, '')}/`
   } catch {
     return null
   }
