@@ -111,7 +111,9 @@ export function SecretaryControlCenter() {
         .order('start_date', { ascending: false })
       if (!active) return
       if (loadError) {
-        setError(`Competitions could not be loaded: ${loadError.message}`)
+        setError(loadError.message.includes('competitions.ended_at')
+          ? 'Tournament lifecycle fields are missing from Supabase. From the updated repository, run `npx supabase db push`, then refresh this page.'
+          : `Competitions could not be loaded: ${loadError.message}`)
       } else {
         const rows = (data ?? []) as Competition[]
         setCompetitions(rows)

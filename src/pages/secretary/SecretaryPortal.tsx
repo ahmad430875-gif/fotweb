@@ -502,6 +502,8 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
       setRows([])
       setError(loadError.message.includes('batch_session')
         ? 'The database is missing the batch/session fields. Apply migration 202610150003_academic_progression.sql in Supabase, then refresh this page.'
+        : loadError.message.includes('competitions.ended_at')
+          ? 'Tournament lifecycle fields are missing from Supabase. From the updated repository, run `npx supabase db push`, then refresh this page.'
         : `Records could not be loaded: ${loadError.message}`)
     } else { setRows((data ?? []) as unknown as Row[]); setError('') }
     if (kind === 'teams') {

@@ -85,7 +85,7 @@ Replace `YOUR_PROJECT_REF` with the project reference shown in the Supabase proj
 
 The Tournament Control workspace requires `202610160001_institutional_tournament_control.sql`. If the portal reports that `public.match_brackets` is missing, confirm that migration is applied to the same project used by the app. If it is listed as applied but PostgREST still reports a schema-cache error, run `NOTIFY pgrst, 'reload schema';` in the Supabase SQL Editor and reload the portal.
 
-Tournament invitations, lifecycle controls, and group qualification also require `202610160002_multi_university_competitions.sql` and `202610170001_competition_lifecycle_and_groups.sql`. Apply pending migrations in order with `npx supabase db push`. Then deploy the updated Secretary account-management function with `npx supabase functions deploy manage-secretary`.
+Tournament invitations, lifecycle controls, and group qualification also require `202610160002_multi_university_competitions.sql`, `202610170001_competition_lifecycle_and_groups.sql`, and `202610170002_break_team_policy_recursion.sql`. Apply pending migrations in order with `npx supabase db push`. This also repairs a recursive team-registration RLS policy. Then deploy the updated Secretary account-management function with `npx supabase functions deploy manage-secretary`.
 
 ### Deploy university invitations
 
