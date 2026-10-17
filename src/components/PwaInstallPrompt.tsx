@@ -1,53 +1,69 @@
 import { useEffect, useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
 }
 
-export function PwaInstallPrompt() {
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
-  const [installed, setInstalled] = useState(false)
+let pendingInstallPrompt: InstallPromptEvent | null = null
+
+export function PwaInstallButton() {
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(pendingInstallPrompt)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => {
-    const standaloneNavigator = navigator as Navigator & { standalone?: boolean }
-    setInstalled(
-      window.matchMedia('(display-mode: standalone)').matches
-      || standaloneNavigator.standalone === true,
-    )
-
     function handleInstallPrompt(event: Event) {
       event.preventDefault()
-      setInstallPrompt(event as InstallPromptEvent)
-    }
-
-    function handleInstalled() {
-      setInstalled(true)
-      setInstallPrompt(null)
+      pendingInstallPrompt = event as InstallPromptEvent
+      setInstallPrompt(pendingInstallPrompt)
+      setHelpOpen(false)
     }
 
     window.addEventListener('beforeinstallprompt', handleInstallPrompt)
-    window.addEventListener('appinstalled', handleInstalled)
     return () => {
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt)
-      window.removeEventListener('appinstalled', handleInstalled)
     }
   }, [])
 
   async function installApp() {
-    if (!installPrompt) return
-    await installPrompt.prompt()
-    await installPrompt.userChoice
-    setInstallPrompt(null)
+    if (!installPrompt) {
+      setHelpOpen((open) => !open)
+      return
+    }
+    try {
+      await installPrompt.prompt()
+      await installPrompt.userChoice
+      pendingInstallPrompt = null
+      setInstallPrompt(null)
+    } catch {
+      setHelpOpen(true)
+    }
   }
 
-  if (installed || !installPrompt) return null
+  const isAppleMobile = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const installInstructions = isAppleMobile
+    ? 'In Safari, tap Share, then Add to Home Screen.'
+    : 'Open your browser menu and choose Install app or Add to Home screen.'
 
   return (
-    <button className="pwa-install-button" type="button" onClick={() => void installApp()}>
-      <Download size={18} aria-hidden="true" />
-      <span>Install app</span>
-    </button>
+    <div className="pwa-install-control">
+      <button
+        className="pwa-install-button"
+        type="button"
+        aria-label="Install app"
+        aria-expanded={helpOpen}
+        onClick={() => void installApp()}
+      >
+        <Download size={17} aria-hidden="true" />
+        <span>Install app</span>
+      </button>
+      {helpOpen && <div className="pwa-install-help" role="status">
+        <span>{installInstructions}</span>
+        <button type="button" aria-label="Dismiss install instructions" onClick={() => setHelpOpen(false)}>
+          <X size={15} />
+        </button>
+      </div>}
+    </div>
   )
 }

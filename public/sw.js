@@ -10,7 +10,7 @@ self.addEventListener('install', (event) => {
         const index = await cache.match(INDEX_URL)
         if (!index) throw new Error('Touchline app shell could not be cached.')
         const html = await index.text()
-        const assets = [...html.matchAll(/(?:src|href)="([^\"]+\.(?:js|css))"/g)]
+        const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)]
           .map((match) => new URL(match[1], APP_ROOT))
           .filter((url) => url.origin === self.location.origin)
           .map((url) => url.toString())

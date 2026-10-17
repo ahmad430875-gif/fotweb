@@ -20,7 +20,6 @@ import { SecretaryAnnouncementsPage, SecretaryClassTeamsPage, SecretaryLiveMatch
 import { SecretaryControlCenter } from './pages/secretary/SecretaryControlCenter'
 import { SecretaryLeaguePortal } from './pages/secretary/SecretaryLeaguePortal'
 import { initialAuthCallbackType } from './lib/supabase'
-import { PwaInstallPrompt } from './components/PwaInstallPrompt'
 
 function App() {
   const navigate = useNavigate()
@@ -32,7 +31,6 @@ function App() {
   }, [navigate])
 
   return (
-    <>
       <Routes>
         <Route path="/" element={<PublicHomePage />} />
         <Route path="/competitions" element={<PublicCompetitionsPage />} />
@@ -100,8 +98,6 @@ function App() {
         <Route path="/forbidden" element={<main className="access-state"><span className="eyebrow">UNIVERSITY ACCESS</span><h1>This portal is for platform administrators.</h1><p>University Sports Secretaries must sign in with an authorized university account.</p></main>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <PwaInstallPrompt />
-    </>
   )
 }
 

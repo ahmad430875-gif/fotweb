@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowDownRight, ArrowRight, CalendarDays, CircleDot, Goal, MapPin, ShieldCheck, Trophy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { FootballLogo } from '../components/FootballLogo'
+import { PwaInstallButton } from '../components/PwaInstallPrompt'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import { publicImageUrl } from '../lib/imageUrl'
 
@@ -118,6 +119,7 @@ export function PublicFrame({ children }: { children: React.ReactNode }) {
           <Link to="/competitions">Competitions</Link>
           <Link to="/universities">Universities</Link>
         </nav>
+        <PwaInstallButton />
         <Link className="public-admin-link" to="/admin/login">
           <ShieldCheck size={15} />
           <span>Admin sign in</span>

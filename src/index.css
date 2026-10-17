@@ -47,27 +47,72 @@ a {
   touch-action: manipulation;
 }
 
+.pwa-install-control {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .pwa-install-button {
-  position: fixed;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 80;
-  min-height: 46px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  padding: 0 16px;
+  gap: 7px;
+  padding: 0 11px;
   border: 1px solid #1f6048;
-  border-radius: 6px;
+  border-radius: 5px;
   background: #2e7d5d;
-  box-shadow: 0 8px 24px rgb(30 41 37 / 20%);
   color: #fff;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .pwa-install-button:hover {
   background: #1f6048;
+}
+
+.pwa-install-help {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 90;
+  width: min(280px, calc(100vw - 24px));
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #d9e3de;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(30 41 37 / 16%);
+  color: #1e2925;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pwa-install-help > button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #5c6b64;
+  cursor: pointer;
+}
+
+@media (max-width: 440px) {
+  .pwa-install-button {
+    width: 40px;
+    padding: 0;
+  }
+
+  .pwa-install-button > span {
+    display: none;
+  }
 }
