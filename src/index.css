@@ -41,3 +41,33 @@ a {
   color: #1e2925;
   background: #dcebe3;
 }
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+.pwa-install-button {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 80;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 16px;
+  border: 1px solid #1f6048;
+  border-radius: 6px;
+  background: #2e7d5d;
+  box-shadow: 0 8px 24px rgb(30 41 37 / 20%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pwa-install-button:hover {
+  background: #1f6048;
+}

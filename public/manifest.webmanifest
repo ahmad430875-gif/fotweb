@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Touchline | Football scores & news",
+  "short_name": "Touchline",
+  "description": "Live football scores, matchday fixtures and the stories behind the game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f7f5",
+  "theme_color": "#f3f7f5",
+  "icons": [
+    {
+      "src": "./icons/touchline.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

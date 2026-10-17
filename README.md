@@ -56,6 +56,10 @@ npm run dev
 
 Open the Vite URL (usually `http://localhost:5173`). Public pages should load. If the Supabase env vars are missing or invalid, the app will show a clear error and tell you exactly which values are missing or invalid.
 
+### Install on mobile
+
+The hosted app is installable from supported mobile browsers over HTTPS. In Chrome, use **Install app** when it appears or choose **Install app** from the browser menu. On iPhone or iPad, open the site in Safari and use **Share → Add to Home Screen**. The app shell is cached for offline startup, but sign-in and Supabase-backed content still require a network connection.
+
 4) Optional — run Supabase locally (end-to-end)
 
 The repo contains `supabase/config.toml`, `supabase/migrations/`, and `supabase/functions/`. To run Supabase locally if you want full backend behavior:
