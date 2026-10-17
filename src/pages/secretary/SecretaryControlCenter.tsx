@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, Check, ClipboardList, ClipboardPenLine, Flag, LockKeyhole, ShieldAlert, ShieldCheck, UnlockKeyhole, Users, type LucideIcon } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
+import { universityPortalPath, useUniversityScope } from '../../auth/useUniversityScope'
 import { supabase } from '../../lib/supabase'
 import { InstitutionalEligibilityCheck } from './InstitutionalEligibilityCheck'
 import { TournamentBracketView, type BracketFixture, type BracketRound } from './TournamentBracketView'
@@ -48,12 +49,14 @@ function currentTimestamp() {
 
 export function SecretaryControlCenter() {
   const { profile, session } = useAuth()
+  const scope = useUniversityScope()
   const location = useLocation()
   const currentView = location.pathname.split('/').filter(Boolean).at(-1) ?? 'control-center'
   const activeStepIndex = controlSteps.findIndex((step) => step.id === currentView)
   const activeStep = controlSteps[activeStepIndex]
-  const controlBasePath = '/secretary/control-center'
-  const universityId = profile?.university_id
+  const portalBasePath = scope?.basePath ?? '/secretary'
+  const controlBasePath = universityPortalPath(portalBasePath, '/control-center')
+  const universityId = scope?.universityId ?? profile?.university_id
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [competitionId, setCompetitionId] = useState('')
   const [teams, setTeams] = useState<Team[]>([])
@@ -656,7 +659,7 @@ export function SecretaryControlCenter() {
         <div className="tcc-panel tcc-empty-state">
           <ClipboardList size={23} /><strong>Select or create a competition</strong>
           <span>Choose a competition above to manage its tournament. No competitions yet?</span>
-          <Link className="button button-primary" to="/secretary/competitions">Open competitions</Link>
+          <Link className="button button-primary" to={universityPortalPath(portalBasePath, '/competitions')}>Open competitions</Link>
         </div>
       ) : competition.ended_at ? (
         <div className="tcc-panel tcc-ended-state"><LockKeyhole size={23} /><strong>Tournament ended</strong><span>This competition and all its tournament records are permanently read-only. Published results remain available to the public.</span></div>

@@ -12,6 +12,7 @@ type PublicCompetition = {
   type: string
   start_date: string
   end_date: string
+  ended_at: string | null
   venue: string | null
   format: string
   university_id: string
@@ -80,7 +81,7 @@ function usePublicData() {
         return
       }
       const [competitions, universities, teams, matches] = await Promise.all([
-        supabase.from('competitions').select('id, name, season, type, start_date, end_date, venue, format, university_id, description').eq('status', 'published').order('start_date', { ascending: false }),
+        supabase.from('competitions').select('id, name, season, type, start_date, end_date, ended_at, venue, format, university_id, description').eq('status', 'published').order('start_date', { ascending: false }),
         supabase.from('universities').select('id, name, short_name, logo_url, location').eq('is_active', true).order('name'),
         supabase.from('teams').select('id, name, short_name, logo_url'),
         supabase.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, round, venue, published_at').not('published_at', 'is', null).order('kickoff_at', { ascending: false }).limit(12),
@@ -245,24 +246,24 @@ export function PublicCompetitionsPage() {
     <PublicFrame>
       <main className="public-directory">
         <section className="public-directory-heading">
-          <span className="public-overline">THE SEASON, IN ONE PLACE</span>
-          <h1>Competitions</h1>
-          <p>Explore published university leagues, tournaments and campus rivalries.</p>
+          <span className="public-overline">UNIVERSITY TOURNAMENT HISTORY</span>
+          <h1>Competitions &amp; records</h1>
+          <p>Explore university tournaments, results and player records from across the network.</p>
           <div className="public-directory-meta">
-            <span><Trophy size={15} /> {data.loading ? 'Loading' : data.competitions.length} published</span>
-            <span>Open to everyone</span>
+            <span><Trophy size={15} /> {data.loading ? 'Loading' : data.competitions.length} tournaments</span>
+            <span>Current and completed records</span>
           </div>
         </section>
-        <section className="public-directory-content" aria-label="Published competitions">
+        <section className="public-directory-content" aria-label="University tournament history">
           <label className="public-search">
             <span className="sr-only">Search competitions</span>
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search competition, season or university" />
           </label>
-          {data.error ? <PublicNotice message="Competition data is temporarily unavailable." /> : data.loading ? <div className="public-loading">Loading published competitions…</div> : visible.length === 0 ? (
+          {data.error ? <PublicNotice message="Competition data is temporarily unavailable." /> : data.loading ? <div className="public-loading">Loading tournament history…</div> : visible.length === 0 ? (
             <div className="public-empty">
               <Trophy size={20} />
-              <strong>{data.competitions.length ? 'No matching competitions' : 'No published competitions yet'}</strong>
-              <span>{data.competitions.length ? 'Try another search.' : 'New competitions will appear here when they are published.'}</span>
+              <strong>{data.competitions.length ? 'No matching competitions' : 'No tournament history yet'}</strong>
+              <span>{data.competitions.length ? 'Try another search.' : 'University tournaments will appear here when they are published.'}</span>
             </div>
           ) : (
             <div className="public-competition-grid public-competition-grid-wide">
@@ -335,7 +336,7 @@ function CompetitionCard({ competition, universities }: { competition: PublicCom
       <article className="public-competition-card">
         <div className="public-competition-top">
           <span className="public-type-tag">{formatLabel(competition.type)}</span>
-          <span className="public-season">{competition.season}</span>
+          <span className="public-season">{competition.ended_at ? `COMPLETED · ${competition.season}` : competition.season}</span>
         </div>
         <h3>{competition.name}</h3>
         <div className="public-host">

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { BarChart3, Building2, CalendarDays, ChevronDown, ChevronRight, CircleDot, CircleHelp, GraduationCap, LayoutDashboard, LogOut, MailPlus, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trophy, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
+import { universityPortalPath, useUniversityScope } from '../../auth/useUniversityScope'
 import { FootballLogo } from '../../components/FootballLogo'
 import { supabase } from '../../lib/supabase'
 import { publicImageUrl } from '../../lib/imageUrl'
@@ -9,7 +10,7 @@ import './SecretaryPortal.css'
 
 type RecordKind = 'competitions' | 'teams' | 'players' | 'matches'
 type Option = { label: string; value: string }
-type Field = { name: string; label: string; type?: string; required?: boolean; options?: Option[]; full?: boolean; placeholder?: string }
+type Field = { name: string; label: string; type?: string; required?: boolean; options?: Option[]; full?: boolean; multiline?: boolean; placeholder?: string }
 type Row = Record<string, unknown>
 type MatchRow = { id: string; home_team_id: string; away_team_id: string; competition_id: string; kickoff_at: string; status: string }
 
@@ -61,37 +62,45 @@ const navigationGroups = [
   },
 ]
 
-function navigationGroupForPath(pathname: string) {
+function navigationGroupForPath(pathname: string, basePath: string) {
   return navigationGroups.find((group) => group.items.some(({ to }) =>
-    to === '/secretary' ? pathname === to : pathname === to || pathname.startsWith(`${to}/`),
+    to === '/secretary' ? pathname === basePath : pathname === universityPortalPath(basePath, to.slice('/secretary'.length))
+      || pathname.startsWith(`${universityPortalPath(basePath, to.slice('/secretary'.length))}/`),
   ))?.id ?? 'workspace'
 }
 
 export function SecretaryLayout() {
   const { profile, session, signOut } = useAuth()
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
+  const basePath = scope?.basePath ?? '/secretary'
   const location = useLocation()
   const navigate = useNavigate()
   const [universityName, setUniversityName] = useState('University workspace')
+  const [universityError, setUniversityError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [navGroupState, setNavGroupState] = useState(() => ({
     pathname: location.pathname,
-    openGroup: navigationGroupForPath(location.pathname),
+    openGroup: navigationGroupForPath(location.pathname, basePath),
   }))
   const [signingOut, setSigningOut] = useState(false)
   const openNavGroup = navGroupState.pathname === location.pathname
     ? navGroupState.openGroup
-    : navigationGroupForPath(location.pathname)
+    : navigationGroupForPath(location.pathname, basePath)
 
   useEffect(() => {
     let active = true
     async function loadUniversity() {
-      if (!supabase || !profile?.university_id) return
-      const { data } = await supabase.from('universities').select('name').eq('id', profile.university_id).maybeSingle()
+      if (!supabase || !universityId) return
+      const { data, error } = await supabase.from('universities').select('name').eq('id', universityId).maybeSingle()
+      if (error) { setUniversityError(`University workspace could not be loaded: ${error.message}`); return }
+      if (!data) { setUniversityError('This university workspace could not be found.'); return }
+      setUniversityError('')
       if (active && data?.name) setUniversityName(data.name)
     }
     void loadUniversity()
     return () => { active = false }
-  }, [profile?.university_id])
+  }, [universityId])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -103,14 +112,15 @@ export function SecretaryLayout() {
     <div className="secretary-shell">
       {mobileNavOpen && <button className="secretary-scrim" type="button" aria-label="Close menu" onClick={() => setMobileNavOpen(false)} />}
       <aside className={`secretary-sidebar ${mobileNavOpen ? 'secretary-sidebar-open' : ''}`}>
-        <Link className="secretary-brand" to="/secretary">
+        <Link className="secretary-brand" to={basePath}>
           <span className="secretary-brand-mark"><FootballLogo size={25} /></span>
           <span>FOTWEB<span>.</span><small>UNIVERSITY PORTAL</small></span>
         </Link>
         <div className="secretary-campus">
           <span className="secretary-campus-icon"><Building2 size={16} /></span>
-          <span><strong>{universityName}</strong><small>Sports Secretary</small></span>
+          <span><strong>{universityName}</strong><small>{scope ? 'Super Admin workspace' : 'Sports Secretary'}</small></span>
         </div>
+        {universityError && <div className="inline-notice notice-error" role="alert">{universityError}</div>}
         <nav className="secretary-nav" aria-label="University portal navigation">
           {navigationGroups.map(({ id, label, items }) => (
             <section className="secretary-nav-group" key={id}>
@@ -128,7 +138,7 @@ export function SecretaryLayout() {
               </button>
               <div className="secretary-nav-group-links" id={`secretary-nav-${id}`} hidden={openNavGroup !== id}>
                 {items.map(({ to, label: itemLabel, icon: Icon, end }) => (
-                  <NavLink key={to} to={to} end={end} onClick={() => setMobileNavOpen(false)} className={({ isActive }) => `secretary-nav-link ${isActive ? 'secretary-nav-active' : ''}`}>
+                  <NavLink key={to} to={universityPortalPath(basePath, to.slice('/secretary'.length))} end={end} onClick={() => setMobileNavOpen(false)} className={({ isActive }) => `secretary-nav-link ${isActive ? 'secretary-nav-active' : ''}`}>
                     <Icon size={17} /><span>{itemLabel}</span><ChevronRight className="secretary-nav-chevron" size={14} />
                   </NavLink>
                 ))}
@@ -136,7 +146,7 @@ export function SecretaryLayout() {
             </section>
           ))}
         </nav>
-        <div className="secretary-sidebar-note"><span className="secretary-live-dot" /><span>University data is private to this workspace.</span></div>
+        <div className="secretary-sidebar-note"><span className="secretary-live-dot" /><span>{scope ? <Link to={`/admin/universities/${scope.universityId}`}>Return to university profile</Link> : 'University data is private to this workspace.'}</span></div>
         
         {/* Updated Account / Logout Card Section */}
         <div className="secretary-account flex flex-col gap-2 items-stretch">
@@ -159,10 +169,10 @@ export function SecretaryLayout() {
               <Menu size={19} />
             </button>
             <div className="secretary-breadcrumb">
-              <span>University</span><span>/</span><strong>{location.pathname.startsWith('/secretary/control-center') ? 'Tournament Control' : navigationGroups.flatMap(({ items }) => items).find((item) => item.to === location.pathname)?.label ?? 'Operations'}</strong>
+              <span>{scope ? 'Super Admin' : 'University'}</span><span>/</span><strong>{location.pathname.includes('/control-center') ? 'Tournament Control' : navigationGroups.flatMap(({ items }) => items).find((item) => universityPortalPath(basePath, item.to.slice('/secretary'.length)) === location.pathname)?.label ?? 'Operations'}</strong>
             </div>
           </div>
-          <div className="secretary-topbar-actions"><span className="secretary-secure"><i /> University access</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div>
+          <div className="secretary-topbar-actions"><span className="secretary-secure"><i /> {scope ? 'Super Admin access' : 'University access'}</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div>
         </header>
         <div className="secretary-content">
           <Outlet context={{ universityName }} />
@@ -174,7 +184,9 @@ export function SecretaryLayout() {
 
 export function SecretaryDashboardPage() {
   const { profile } = useAuth()
-  const universityId = profile?.university_id
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
+  const basePath = scope?.basePath ?? '/secretary'
   const [counts, setCounts] = useState([0, 0, 0, 0])
   const [matches, setMatches] = useState<MatchRow[]>([])
   const [teamNames, setTeamNames] = useState<Record<string, string>>({})
@@ -255,28 +267,28 @@ export function SecretaryDashboardPage() {
   }, [universityId])
 
   const metrics = [
-    { label: 'Active competitions', value: counts[0], icon: Trophy, tone: 'amber', href: '/secretary/competitions' },
-    { label: 'Registered teams', value: counts[1], icon: Users, tone: 'green', href: '/secretary/teams' },
-    { label: 'Upcoming fixtures', value: counts[2], icon: CalendarDays, tone: 'blue', href: '/secretary/matches' },
-    { label: 'Pending team entries', value: counts[3], icon: Users, tone: 'red', href: '/secretary/leagues' },
+    { label: 'Active competitions', value: counts[0], icon: Trophy, tone: 'amber', href: universityPortalPath(basePath, '/competitions') },
+    { label: 'Registered teams', value: counts[1], icon: Users, tone: 'green', href: universityPortalPath(basePath, '/teams') },
+    { label: 'Upcoming fixtures', value: counts[2], icon: CalendarDays, tone: 'blue', href: universityPortalPath(basePath, '/matches') },
+    { label: 'Pending team entries', value: counts[3], icon: Users, tone: 'red', href: universityPortalPath(basePath, '/leagues') },
   ]
 
   return (
     <section className="secretary-dashboard">
       <div className="secretary-heading">
         <div><span className="eyebrow">CAMPUS OPERATIONS</span><h1>University overview</h1><p>Your competitions, squads, players, and match schedule.</p></div>
-        <Link className="button button-primary" to="/secretary/competitions"><Trophy size={15} /> New competition</Link>
+        <Link className="button button-primary" to={universityPortalPath(basePath, '/competitions')}><Trophy size={15} /> New competition</Link>
       </div>
       {!supabase && <div className="inline-notice notice-warning"><CircleDot size={17} /><span>Connect Supabase to load university data.</span></div>}
       {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
       <details className="secretary-first-steps">
         <summary><CircleHelp size={17} /><span><strong>New to the portal?</strong><small>Follow these steps to set up your first competition.</small></span><ChevronDown size={16} /></summary>
         <ol>
-          <li><Link to="/secretary/teams">Create your university or class team</Link><span>Choose the team type that matches your competition.</span></li>
-          <li><Link to="/secretary/players">Add players and confirm enrollment</Link><span>Enter student details and mark eligible players as actively enrolled.</span></li>
-          <li><Link to="/secretary/competitions">Create a competition</Link><span>Set its season, format, and dates before entering teams.</span></li>
-          <li><Link to="/secretary/leagues">Invite universities or enter your team</Link><span>Use Leagues &amp; Invitations to join or organize a shared competition.</span></li>
-          <li><Link to="/secretary/matches">Schedule fixtures</Link><span>Set teams, kick-off time, and venue; then publish when ready.</span></li>
+          <li><Link to={universityPortalPath(basePath, '/teams')}>Create your university or class team</Link><span>Choose the team type that matches your competition.</span></li>
+          <li><Link to={universityPortalPath(basePath, '/players')}>Add players and confirm enrollment</Link><span>Enter student details and mark eligible players as actively enrolled.</span></li>
+          <li><Link to={universityPortalPath(basePath, '/competitions')}>Create a competition</Link><span>Set its season, format, and dates before entering teams.</span></li>
+          <li><Link to={universityPortalPath(basePath, '/leagues')}>Add universities or enter your team</Link><span>Use Leagues &amp; Invitations to join or organize a shared competition.</span></li>
+          <li><Link to={universityPortalPath(basePath, '/matches')}>Schedule fixtures</Link><span>Set teams, kick-off time, and venue; then publish when ready.</span></li>
         </ol>
       </details>
       <div className="secretary-metric-grid">
@@ -291,12 +303,12 @@ export function SecretaryDashboardPage() {
       <section className="secretary-panel secretary-fixtures">
         <div className="secretary-panel-heading">
           <div><span className="eyebrow">UP NEXT</span><h2>Upcoming fixtures</h2></div>
-          <Link to="/secretary/matches">All fixtures <ChevronRight size={14} /></Link>
+          <Link to={universityPortalPath(basePath, '/matches')}>All fixtures <ChevronRight size={14} /></Link>
         </div>
         {loading ? <div className="secretary-empty">Loading fixtures…</div> : matches.length === 0 ? (
           <div className="secretary-empty">
             <CalendarDays size={22} /><strong>No upcoming fixtures</strong><span>Create a fixture to build your match calendar.</span>
-            <Link className="button button-secondary" to="/secretary/matches">Schedule a match</Link>
+            <Link className="button button-secondary" to={universityPortalPath(basePath, '/matches')}>Schedule a match</Link>
           </div>
         ) : (
           <div className="secretary-fixture-list">
@@ -317,8 +329,8 @@ export function SecretaryDashboardPage() {
         )}
       </section>
       <div className="secretary-quick-links">
-        <Link to="/secretary/teams"><Users size={17} /><span><strong>Register a team</strong><small>Set up a campus squad</small></span><ChevronRight size={15} /></Link>
-        <Link to="/secretary/players"><GraduationCap size={17} /><span><strong>Add a player</strong><small>Build the university roster</small></span><ChevronRight size={15} /></Link>
+        <Link to={universityPortalPath(basePath, '/teams')}><Users size={17} /><span><strong>Register a team</strong><small>Set up a campus squad</small></span><ChevronRight size={15} /></Link>
+        <Link to={universityPortalPath(basePath, '/players')}><GraduationCap size={17} /><span><strong>Add a player</strong><small>Build the university roster</small></span><ChevronRight size={15} /></Link>
       </div>
     </section>
   )
@@ -336,6 +348,8 @@ const optionSets: Record<string, Option[]> = {
   availability: [{ label: 'Available', value: 'true' }, { label: 'Unavailable', value: 'false' }],
   visibility: [{ label: 'Keep private', value: 'false' }, { label: 'Show publicly', value: 'true' }],
   enrollmentStatus: [{ label: 'Inactive / not confirmed', value: 'inactive' }, { label: 'Actively enrolled', value: 'active' }],
+  recordStatus: [{ label: 'Active', value: 'true' }, { label: 'Inactive', value: 'false' }],
+  primaryStatus: [{ label: 'Primary competition', value: 'true' }, { label: 'Regular competition', value: 'false' }],
 }
 
 const fieldsByKind: Record<RecordKind, Field[]> = {
@@ -350,6 +364,8 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
     { name: 'points_for_draw', label: 'Points for draw', type: 'number', required: true, placeholder: '1' },
     { name: 'points_for_loss', label: 'Points for loss', type: 'number', required: true, placeholder: '0' },
     { name: 'venue', label: 'Primary venue', full: true },
+    { name: 'description', label: 'Description', multiline: true, full: true },
+    { name: 'is_primary', label: 'Competition role', type: 'select', options: optionSets.primaryStatus, required: true },
     { name: 'logo_url', label: 'Competition logo URL', type: 'url', placeholder: 'Paste a public image URL or Google Drive share link' },
     { name: 'banner_url', label: 'Competition banner URL', type: 'url', placeholder: 'Paste a public image URL or Google Drive share link', full: true },
   ],
@@ -359,11 +375,17 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
     { name: 'type', label: 'Team type', type: 'select', options: optionSets.teamType, required: true },
     { name: 'academic_class', label: 'Class year', type: 'select', options: optionSets.academicYear },
     { name: 'batch_session', label: 'Batch / session', placeholder: 'e.g. 2024–2029' },
+    { name: 'logo_url', label: 'Team logo URL', type: 'url' },
+    { name: 'team_photo_url', label: 'Team photo URL', type: 'url' },
+    { name: 'season', label: 'Team season', placeholder: '2026/2027' },
+    { name: 'coach_name', label: 'Coach name' },
+    { name: 'is_active', label: 'Team status', type: 'select', options: optionSets.recordStatus, required: true },
   ],
   players: [
     { name: 'full_name', label: 'Player full name', required: true, full: true },
     { name: 'student_identifier', label: 'Student ID / identifier' },
     { name: 'photo_url', label: 'Player photo URL', type: 'url', placeholder: 'Paste a public image URL or Google Drive share link' },
+    { name: 'date_of_birth', label: 'Date of birth', type: 'date' },
     { name: 'academic_program', label: 'Academic program', type: 'select', options: optionSets.academicProgram },
     { name: 'current_academic_year', label: 'Academic year', type: 'select', options: optionSets.academicYear },
     { name: 'batch_session', label: 'Batch / session', placeholder: 'e.g. 2024–2029' },
@@ -374,6 +396,8 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
     { name: 'injury_status', label: 'Injury status', type: 'select', options: optionSets.injury, required: true },
     { name: 'is_available', label: 'Match availability', type: 'select', options: optionSets.availability, required: true },
     { name: 'public_injury_status', label: 'Show injury status publicly', type: 'select', options: optionSets.visibility, required: true },
+    { name: 'is_active', label: 'Player status', type: 'select', options: optionSets.recordStatus, required: true },
+    { name: 'bio', label: 'Player biography', multiline: true, full: true },
   ],
   matches: [
     { name: 'competition_id', label: 'Competition', type: 'select', required: true },
@@ -382,13 +406,14 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
     { name: 'away_team_id', label: 'Away team', type: 'select', required: true },
     { name: 'kickoff_at', label: 'Kick-off', type: 'datetime-local', required: true },
     { name: 'venue', label: 'Venue' },
+    { name: 'referee', label: 'Referee' },
   ],
 }
 
 const pageCopy: Record<RecordKind, { title: string; description: string; table: string; select: string; order: string; columns: string[] }> = {
-  competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, name, season, type, format, status, start_date, end_date, ended_at, is_primary, is_locked', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
-  teams: { title: 'Teams', description: 'Manage university and class teams, then register them in competitions.', table: 'teams', select: 'id, name, short_name, type, academic_class, batch_session, is_active, is_locked', order: 'name', columns: ['name', 'short_name', 'type', 'academic_class', 'batch_session', 'is_active'] },
-  players: { title: 'Players', description: 'Edit one permanent student profile used across every team and competition.', table: 'players', select: 'id, full_name, student_identifier, photo_url, academic_program, current_academic_year, batch_session, academic_enrollment_status, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'academic_program', 'current_academic_year', 'batch_session', 'academic_enrollment_status', 'position', 'injury_status', 'is_available'] },
+  competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, name, season, type, format, status, start_date, end_date, ended_at, is_primary, is_locked, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
+  teams: { title: 'Teams', description: 'Manage university and class teams, then register them in competitions.', table: 'teams', select: 'id, name, short_name, type, academic_class, batch_session, logo_url, team_photo_url, season, coach_name, is_active, is_locked', order: 'name', columns: ['name', 'short_name', 'type', 'academic_class', 'batch_session', 'is_active'] },
+  players: { title: 'Players', description: 'Edit one permanent student profile used across every team and competition.', table: 'players', select: 'id, full_name, student_identifier, photo_url, date_of_birth, bio, academic_program, current_academic_year, batch_session, academic_enrollment_status, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'academic_program', 'current_academic_year', 'batch_session', 'academic_enrollment_status', 'position', 'injury_status', 'is_available'] },
   matches: { title: 'Fixtures', description: 'Schedule, publish, and prepare fixtures for the live match centre.', table: 'matches', select: 'id, competition_id, home_team_id, away_team_id, kickoff_at, status, round, venue, referee, published_at, is_locked', order: 'kickoff_at', columns: ['kickoff_at', 'home_team_id', 'away_team_id', 'status'] },
 }
 
@@ -396,7 +421,9 @@ const singularLabels: Record<RecordKind, string> = { competitions: 'competition'
 
 export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   const { profile, session } = useAuth()
-  const universityId = profile?.university_id
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
+  const basePath = scope?.basePath ?? '/secretary'
   const config = pageCopy[kind]
   const [rows, setRows] = useState<Row[]>([])
   const [teamOptions, setTeamOptions] = useState<Option[]>([])
@@ -540,15 +567,21 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     if (kind === 'teams' && text('type') === 'class_team' && !text('academic_class')) { setBusy(false); setError('Enter the class or cohort for this team.'); return }
     if (kind === 'matches' && text('home_team_id') === text('away_team_id')) { setBusy(false); setError('Choose two different teams.'); return }
     const payload = buildPayload(kind, values, universityId, session?.user.id ?? '')
-    const updatePayload = Object.fromEntries(Object.entries(payload).filter(([key]) => key !== 'created_by'))
-    const saveResult = editingRow && kind === 'players'
-      ? await supabase.from('players').update(updatePayload as never).eq('id', String(editingRow.id)).eq('university_id', universityId).select('id').single()
+    const updatePayload = Object.fromEntries(Object.entries(payload).filter(([key]) => key !== 'created_by' && key !== 'status'))
+    const saveResult = editingRow
+      ? await supabase.from(config.table).update(updatePayload as never).eq('id', String(editingRow.id)).eq('university_id', universityId).select('id').single()
       : await supabase.from(config.table).insert(payload as never).select('id').single()
     setBusy(false)
     if (saveResult.error) { setError(friendlyRecordError(saveResult.error)); return }
     form.reset()
     setUrlPreviews({})
-    setNotice(editingRow ? 'Player profile updated everywhere this permanent profile is used.' : `${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} added.`)
+    setNotice(editingRow
+      ? kind === 'players'
+        ? 'Player profile updated everywhere this permanent profile is used.'
+        : `${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} updated.`
+      : kind === 'competitions' && text('type') === 'inter_class'
+        ? 'Inter-class tournament added. Active class teams and their eligible registered squads were included automatically.'
+        : `${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} added.`)
     setEditingRow(null)
     await loadRows()
   }
@@ -577,6 +610,16 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   function editPlayer(row: Row) {
     setEditingRow(row)
     setUrlPreviews({ photo_url: String(row.photo_url ?? '') })
+    setError('')
+    setNotice('')
+  }
+
+  function editRecord(row: Row) {
+    setEditingRow(kind === 'matches' && row.kickoff_at
+      ? { ...row, kickoff_at: toDateTimeLocalValue(String(row.kickoff_at)) }
+      : row)
+    setUrlPreviews(Object.fromEntries(['logo_url', 'banner_url', 'photo_url']
+      .map((field) => [field, String(row[field] ?? '')])))
     setError('')
     setNotice('')
   }
@@ -657,25 +700,35 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
       <div className="secretary-record-layout">
         <section className="secretary-panel secretary-create-panel">
           <div className="secretary-panel-heading">
-            <div><span className="eyebrow">{editingRow ? 'EDIT PERMANENT PROFILE' : 'NEW RECORD'}</span><h2>{editingRow ? 'Edit player profile' : kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div>
+            <div><span className="eyebrow">{editingRow ? `EDIT ${singularLabels[kind].toUpperCase()}` : 'NEW RECORD'}</span><h2>{editingRow ? `Edit ${singularLabels[kind]}` : kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div>
             <CircleDot size={17} />
           </div>
           {kind === 'matches' && !managedCompetitionOptions.length ? (
-            <div className="secretary-empty"><CalendarDays size={20} /><strong>Fixtures are managed by the organizer</strong><span>Accept an invitation to see its fixtures here. The university organizing each league schedules and publishes matches.</span><Link className="button button-secondary" to="/secretary/leagues">Open leagues &amp; invitations</Link></div>
+            <div className="secretary-empty"><CalendarDays size={20} /><strong>Fixtures are managed by the organizer</strong><span>Your university must be added to a competition before you can see its fixtures. The university organizing each league schedules and publishes matches.</span><Link className="button button-secondary" to={universityPortalPath(basePath, '/leagues')}>Open leagues &amp; invitations</Link></div>
           ) : <form key={editingRow ? `edit-${String(editingRow.id)}` : `new-${kind}`} className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
             <div className="secretary-field-grid">
               {fields.map((field) => (
                 <label className={field.full ? 'secretary-field secretary-field-full' : 'secretary-field'} key={field.name}>
                   {field.label}
                   {field.options ? (
-                    <select name={field.name} required={field.required} defaultValue={String(editingRow?.[field.name] ?? '')}>
+                    <>
+                    <select
+                      name={field.name}
+                      required={field.required}
+                      disabled={Boolean(scope && editingRow && kind === 'competitions' && field.name === 'type')}
+                      defaultValue={String(editingRow?.[field.name] ?? (field.name === 'is_active' ? 'true' : field.name === 'is_primary' ? 'false' : ''))}
+                    >
                       <option value="">Choose {field.label.toLowerCase()}</option>
                       {Boolean(editingRow?.[field.name]) && !field.options.some((option) => option.value === String(editingRow?.[field.name])) && <option value={String(editingRow?.[field.name])}>{String(editingRow?.[field.name])}</option>}
                       {field.options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
                     </select>
+                    {scope && editingRow && kind === 'competitions' && field.name === 'type' && <input type="hidden" name={field.name} value={String(editingRow.type)} />}
+                    </>
                   ) : (
                     <>
-                      <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} defaultValue={String(editingRow?.[field.name] ?? '')} onChange={field.type === 'url' ? (event) => setUrlPreviews((current) => ({ ...current, [field.name]: event.target.value })) : undefined} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />
+                      {field.multiline
+                        ? <textarea name={field.name} rows={4} defaultValue={String(editingRow?.[field.name] ?? '')} required={field.required} />
+                        : <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} defaultValue={String(editingRow?.[field.name] ?? '')} onChange={field.type === 'url' ? (event) => setUrlPreviews((current) => ({ ...current, [field.name]: event.target.value })) : undefined} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />}
                       {field.type === 'url' && (urlPreviews[field.name] ?? String(editingRow?.[field.name] ?? '')) && <span className="url-image-preview"><img src={publicImageUrl(urlPreviews[field.name] ?? String(editingRow?.[field.name]))} alt={`${field.label} preview`} /><small>Image preview · public URLs only</small></span>}
                     </>
                   )}
@@ -685,7 +738,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             {kind === 'competitions' && <p className="secretary-form-note">New competitions start as drafts. Publish when they are ready for participants and public pages; end only after every fixture is complete or cancelled.</p>}
             {kind === 'matches' && (!teamOptions.length || !competitionOptions.length) && <p className="secretary-form-note">Add at least one competition and two teams before scheduling a fixture.</p>}
             <button className="button button-primary" type="submit" disabled={busy || (kind === 'matches' && (!teamOptions.length || !competitionOptions.length))}>
-              {busy ? 'Saving…' : editingRow ? 'Save player profile' : `Save ${singularLabels[kind]}`}
+              {busy ? 'Saving…' : editingRow ? `Save ${singularLabels[kind]}` : `Save ${singularLabels[kind]}`}
             </button>
             {editingRow && <button className="button button-secondary" type="button" disabled={busy} onClick={() => setEditingRow(null)}>Cancel edit</button>}
           </form>}
@@ -713,7 +766,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             <div className="secretary-table-wrap">
               <table className="secretary-table">
                 <thead>
-                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}{kind === 'competitions' && <th>Actions</th>}{(kind === 'players' || kind === 'teams') && <th>Actions</th>}</tr>
+                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}{kind === 'competitions' && <th>Actions</th>}{(kind === 'players' || kind === 'teams' || scope) && <th>Actions</th>}</tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
@@ -722,18 +775,24 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
                         ? row.ended_at ? 'Ended' : String(row.status).replaceAll('_', ' ')
                         : formatCell(kind, column, row[column], names, competitions)}</td>)}
                       {kind === 'matches' && <td>{managedCompetitionOptions.some((option) => option.value === String(row.competition_id))
-                        ? <button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button>
+                        ? <button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button>
                         : <span>Organizer controls publication</span>}</td>}
                       {kind === 'competitions' && <td>
+                        {scope && !row.ended_at && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit competition</button>}
                         {row.ended_at ? <span className="competition-ended-label">Ended · read-only</span>
                           : row.status === 'draft'
-                            ? <button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void updateCompetitionLifecycle(row, 'publish')}>Publish competition</button>
+                            ? <button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => void updateCompetitionLifecycle(row, 'publish')}>Publish competition</button>
                             : row.status === 'published'
-                              ? <button className="secretary-text-action competition-end-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void updateCompetitionLifecycle(row, 'end')}>End tournament</button>
+                              ? <button className="secretary-text-action competition-end-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => void updateCompetitionLifecycle(row, 'end')}>End tournament</button>
                               : <span>{String(row.status).replaceAll('_', ' ')}</span>}
                       </td>}
-                      {kind === 'players' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => editPlayer(row)}>Edit profile</button></td>}
-                      {kind === 'teams' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked) || !nextAcademicYear(String(row.academic_class ?? ''))} onClick={() => void promoteClassTeam(row)}>{nextAcademicYear(String(row.academic_class ?? '')) ? `Promote to ${nextAcademicYear(String(row.academic_class))}` : row.type === 'class_team' ? 'No next year' : 'University team'}</button></td>}
+                      {kind === 'players' && <td><button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => editPlayer(row)}>Edit profile</button></td>}
+                      {kind === 'teams' && <td>
+                        {scope && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit team</button>}
+                        <button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope) || !nextAcademicYear(String(row.academic_class ?? ''))} onClick={() => void promoteClassTeam(row)}>{nextAcademicYear(String(row.academic_class ?? '')) ? `Promote to ${nextAcademicYear(String(row.academic_class))}` : row.type === 'class_team' ? 'No next year' : 'University team'}</button>
+                      </td>}
+                      {kind === 'matches' && scope && <td>{managedCompetitionOptions.some((option) => option.value === String(row.competition_id))
+                        && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit fixture</button>}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -761,16 +820,32 @@ function buildPayload(kind: RecordKind, values: FormData, universityId: string, 
     points_for_win: Number(text('points_for_win') || 3),
     points_for_draw: Number(text('points_for_draw') || 1),
     points_for_loss: Number(text('points_for_loss') || 0),
+    description: text('description'),
+    is_primary: text('is_primary') === 'true',
     logo_url: text('logo_url') || null,
     banner_url: text('banner_url') || null,
     status: 'draft',
   }
-  if (kind === 'teams') return { ...base, name: text('name'), short_name: text('short_name'), type: text('type'), academic_class: text('type') === 'class_team' ? text('academic_class') : null, batch_session: text('batch_session') || null }
+  if (kind === 'teams') return {
+    ...base,
+    name: text('name'),
+    short_name: text('short_name'),
+    type: text('type'),
+    academic_class: text('type') === 'class_team' ? text('academic_class') : null,
+    batch_session: text('batch_session') || null,
+    logo_url: text('logo_url') || null,
+    team_photo_url: text('team_photo_url') || null,
+    season: text('season') || null,
+    coach_name: text('coach_name') || null,
+    is_active: text('is_active') !== 'false',
+  }
   if (kind === 'players') return {
     ...base,
     full_name: text('full_name'),
     student_identifier: text('student_identifier') || null,
     photo_url: text('photo_url') || null,
+    date_of_birth: text('date_of_birth') || null,
+    bio: text('bio'),
     academic_program: text('academic_program') || null,
     current_academic_year: text('current_academic_year') || null,
     batch_session: text('batch_session') || null,
@@ -781,8 +856,15 @@ function buildPayload(kind: RecordKind, values: FormData, universityId: string, 
     injury_status: text('injury_status') || 'fit',
     is_available: text('is_available') !== 'false',
     public_injury_status: text('public_injury_status') === 'true',
+    is_active: text('is_active') !== 'false',
   }
-  return { ...base, competition_id: text('competition_id'), home_team_id: text('home_team_id'), away_team_id: text('away_team_id'), kickoff_at: new Date(text('kickoff_at')).toISOString(), round: text('round') || null, venue: text('venue') || null, status: 'scheduled' }
+  return { ...base, competition_id: text('competition_id'), home_team_id: text('home_team_id'), away_team_id: text('away_team_id'), kickoff_at: new Date(text('kickoff_at')).toISOString(), round: text('round') || null, venue: text('venue') || null, referee: text('referee') || null, status: 'scheduled' }
+}
+
+function toDateTimeLocalValue(value: string) {
+  const date = new Date(value)
+  const offset = date.getTimezoneOffset()
+  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16)
 }
 
 function formatCell(kind: RecordKind, column: string, value: unknown, teams: Record<string, string>, competitions: Record<string, string>) {

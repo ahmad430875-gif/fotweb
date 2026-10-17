@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { FileText, Megaphone, Pencil, Send, Trash2 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthProvider'
+import { useUniversityScope } from '../../auth/useUniversityScope'
 import { supabase } from '../../lib/supabase'
 
 type NewsScope = 'platform' | 'university'
@@ -24,8 +25,10 @@ const emptyForm: NewsForm = { title: '', body: '', competition_id: '', team_id: 
 
 export function NewsManagementPage({ scope }: { scope: NewsScope }) {
   const { profile, session } = useAuth()
+  const universityScope = useUniversityScope()
+  const scopedUniversityId = universityScope?.universityId ?? profile?.university_id
   const [universities, setUniversities] = useState<University[]>([])
-  const [universityId, setUniversityId] = useState(profile?.university_id ?? '')
+  const [universityId, setUniversityId] = useState(scopedUniversityId ?? '')
   const [competitions, setCompetitions] = useState<Option[]>([])
   const [teams, setTeams] = useState<Option[]>([])
   const [matches, setMatches] = useState<Option[]>([])
@@ -42,8 +45,8 @@ export function NewsManagementPage({ scope }: { scope: NewsScope }) {
     async function loadUniversities() {
       if (!supabase) { setLoading(false); setError('Connect Supabase to manage news.'); return }
       if (scope === 'university') {
-        setUniversityId(profile?.university_id ?? '')
-        if (!profile?.university_id) { setLoading(false); setError('This account is not assigned to a university.'); return }
+        setUniversityId(scopedUniversityId ?? '')
+        if (!scopedUniversityId) { setLoading(false); setError('This account is not assigned to a university.'); return }
         return
       }
       const { data, error: resultError } = await supabase.from('universities').select('id, name').order('name')
@@ -56,7 +59,7 @@ export function NewsManagementPage({ scope }: { scope: NewsScope }) {
     }
     void loadUniversities()
     return () => { active = false }
-  }, [profile?.university_id, scope])
+  }, [scopedUniversityId, scope])
 
   useEffect(() => {
     let active = true

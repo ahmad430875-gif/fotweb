@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Activity, CalendarDays, CircleDot, Shield, Trophy, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
+import { universityPortalPath, useUniversityScope } from '../../auth/useUniversityScope'
 import { supabase } from '../../lib/supabase'
 import { publicImageUrl } from '../../lib/imageUrl'
 
@@ -53,7 +54,8 @@ function Notice({ notice }: { notice: Notice | null }) {
 
 export function SecretaryUniversityTeamPage() {
   const { profile, session } = useAuth()
-  const universityId = profile?.university_id
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
   const [university, setUniversity] = useState<University | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
   const [players, setPlayers] = useState<Player[]>([])
@@ -449,7 +451,8 @@ export function SecretaryUniversityTeamPage() {
 
 export function SecretaryClassTeamsPage() {
   const { profile } = useAuth()
-  const universityId = profile?.university_id
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
   const [teams, setTeams] = useState<ClassTeamRow[]>([])
   const [players, setPlayers] = useState<ClassPlayerRow[]>([])
   const [competitions, setCompetitions] = useState<Array<Competition & { type: string }>>([])
@@ -664,7 +667,8 @@ function normalizeAcademicClass(value: string | null | undefined) {
 
 export function SecretaryAnnouncementsPage() {
   const { profile, session } = useAuth()
-  const universityId = profile?.university_id
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
   const [teams, setTeams] = useState<Array<{ id: string; name: string; type: string }>>([])
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [matches, setMatches] = useState<Match[]>([])
@@ -1115,7 +1119,8 @@ export function SecretaryAnnouncementsPage() {
 
 export function SecretaryLiveMatchPage() {
   const { profile, session } = useAuth()
-  const universityId = profile?.university_id
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
   const [matches, setMatches] = useState<Match[]>([])
   const [matchId, setMatchId] = useState('')
   const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([])
@@ -1327,7 +1332,7 @@ export function SecretaryLiveMatchPage() {
           <CalendarDays size={22} />
           <strong>No active or scheduled match</strong>
           <span>Create and publish a fixture, then open it here.</span>
-          <Link className="button button-secondary" to="/secretary/matches">Open fixtures</Link>
+          <Link className="button button-secondary" to={universityPortalPath(scope?.basePath ?? '/secretary', '/matches')}>Open fixtures</Link>
         </div>
       ) : (
         <div className="secretary-record-layout secretary-live-layout">
@@ -1506,6 +1511,8 @@ function eventLabel(value: string) {
 
 export function SecretaryStandingsPage() {
   const { profile } = useAuth()
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [competitionId, setCompetitionId] = useState('')
   const [rows, setRows] = useState<Array<{ position: number; team_id: string; team_name: string; played: number; won: number; drawn: number; lost: number; goals_for: number; goals_against: number; goal_difference: number; points: number }>>([])
@@ -1515,14 +1522,14 @@ export function SecretaryStandingsPage() {
   useEffect(() => {
     let active = true
     async function loadCompetitions() {
-      if (!supabase || !profile?.university_id) { 
+      if (!supabase || !universityId) {
         setLoading(false)
         return 
       }
       const { data, error } = await supabase
         .from('competitions')
         .select('id, name, season, status, is_locked')
-        .eq('university_id', profile.university_id)
+        .eq('university_id', universityId)
         .eq('status', 'published')
         .order('start_date', { ascending: false })
 
@@ -1534,7 +1541,7 @@ export function SecretaryStandingsPage() {
     }
     void loadCompetitions()
     return () => { active = false }
-  }, [profile?.university_id])
+  }, [universityId])
 
   useEffect(() => {
     let active = true
@@ -1626,19 +1633,21 @@ export function SecretaryStandingsPage() {
 
 export function SecretaryStatisticsPage() {
   const { profile } = useAuth()
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [competitionId, setCompetitionId] = useState('')
   const [players, setPlayers] = useState<Array<{ player_id: string; full_name: string; team_name: string; appearances: number; goals: number; assists: number; yellow_cards: number; red_cards: number; clean_sheets: number }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!supabase || !profile?.university_id) { 
+    if (!supabase || !universityId) {
       setLoading(false)
-      return 
+      return
     }
     supabase.from('competitions')
       .select('id, name, season, status, is_locked')
-      .eq('university_id', profile.university_id)
+      .eq('university_id', universityId)
       .eq('status', 'published')
       .order('start_date', { ascending: false })
       .then(({ data }) => {
@@ -1646,7 +1655,7 @@ export function SecretaryStatisticsPage() {
         if (data?.length) setCompetitionId(data[0].id)
         setLoading(false)
       })
-  }, [profile?.university_id])
+  }, [universityId])
 
   useEffect(() => {
     if (!supabase || !competitionId) { 

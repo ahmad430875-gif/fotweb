@@ -34,7 +34,7 @@ export function PublicUniversityDetailPage() {
       const client = supabase
       const [universityResult, competitionResult, teamResult] = await Promise.all([
         client.from('universities').select('id, name, short_name, logo_url, location').eq('id', id).maybeSingle(),
-        client.from('competitions').select('id, name, season, type, format, start_date, end_date').eq('university_id', id).eq('status', 'published').order('start_date', { ascending: false }),
+        client.from('competitions').select('id, name, season, type, format, start_date, end_date, ended_at').eq('university_id', id).eq('status', 'published').order('start_date', { ascending: false }),
         client.from('teams').select('id, name, short_name, logo_url, team_photo_url, university_id, type, academic_class').eq('university_id', id).eq('is_active', true).order('name'),
       ])
       if (!active) return
@@ -64,9 +64,9 @@ export function PublicUniversityDetailPage() {
           </Link>)}</div>}
         </section>
         <section className="public-detail-section">
-          <div className="public-section-heading"><div><span className="public-overline">THE SEASON</span><h2>Competitions</h2></div><span>{competitions.length} published</span></div>
+          <div className="public-section-heading"><div><span className="public-overline">TOURNAMENT HISTORY</span><h2>Competitions &amp; records</h2></div><span>{competitions.length} published tournaments</span></div>
           {!competitions.length ? <PublicState loading={false} error="" empty /> : <div className="public-competition-grid">{competitions.map((competition) => <Link className="public-competition-card" to={`/competitions/${competition.id}`} key={competition.id}>
-            <div className="public-competition-top"><span className="public-type-tag">{formatLabel(competition.type)}</span><span className="public-season">{competition.season}</span></div><h3>{competition.name}</h3><p>{formatLabel(competition.format)} · {formatDate(competition.start_date)} to {formatDate(competition.end_date)}</p><span className="public-detail-inline">Competition details <ArrowRight size={14} /></span>
+            <div className="public-competition-top"><span className="public-type-tag">{formatLabel(competition.type)}</span><span className="public-season">{competition.ended_at ? `COMPLETED · ${competition.season}` : competition.season}</span></div><h3>{competition.name}</h3><p>{formatLabel(competition.format)} · {formatDate(competition.start_date)} to {formatDate(competition.end_date)}</p><span className="public-detail-inline">Tournament records <ArrowRight size={14} /></span>
           </Link>)}</div>}
         </section>
       </>}

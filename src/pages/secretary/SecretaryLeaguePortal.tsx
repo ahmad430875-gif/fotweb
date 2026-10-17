@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, Building2, CircleHelp, MailPlus, Trophy, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
+import { universityPortalPath, useUniversityScope } from '../../auth/useUniversityScope'
 import { supabase } from '../../lib/supabase'
 import './SecretaryLeaguePortal.css'
 
@@ -13,7 +14,9 @@ type Entry = { competition_id: string; team_id: string; university_id: string }
 
 export function SecretaryLeaguePortal() {
   const { profile, session } = useAuth()
-  const universityId = profile?.university_id
+  const scope = useUniversityScope()
+  const universityId = scope?.universityId ?? profile?.university_id
+  const basePath = scope?.basePath ?? '/secretary'
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [participations, setParticipations] = useState<Participation[]>([])
   const [universities, setUniversities] = useState<University[]>([])
@@ -33,7 +36,11 @@ export function SecretaryLeaguePortal() {
   const universitiesById = useMemo(() => Object.fromEntries(universities.map((university) => [university.id, university])), [universities])
   const hostedCompetitions = competitions.filter((competition) => competition.university_id === universityId)
   const acceptedParticipations = participations.filter((participation) => participation.participation_status === 'accepted' && competitionsById[participation.competition_id]?.university_id !== universityId)
-  const invitations = participations.filter((participation) => participation.participation_status === 'invited')
+  const addedUniversityIds = new Set(participations
+    .filter((participation) => participation.participation_status === 'accepted'
+      && competitionsById[participation.competition_id]?.university_id === universityId
+      && participation.university_id !== universityId)
+    .map((participation) => participation.university_id))
   const alreadyInvitedIds = new Set(participations
     .filter((participation) => participation.competition_id === hostCompetitionId && participation.participation_status !== 'declined')
     .map((participation) => participation.university_id))
@@ -131,15 +138,16 @@ export function SecretaryLeaguePortal() {
     setBusy(true)
     setError('')
     setNotice('')
+    const invitedAt = new Date().toISOString()
     const declinedInvitation = participations.find((participation) =>
       participation.competition_id === hostCompetitionId
       && participation.university_id === inviteUniversityId
       && participation.participation_status === 'declined')
     const invitationUpdate = {
-      participation_status: 'invited',
+      participation_status: 'accepted',
       invited_by: session.user.id,
-      invited_at: new Date().toISOString(),
-      responded_at: null,
+      invited_at: invitedAt,
+      responded_at: invitedAt,
     }
     const { error: inviteError } = declinedInvitation
       ? await supabase.from('competition_participants').update(invitationUpdate)
@@ -148,32 +156,17 @@ export function SecretaryLeaguePortal() {
         competition_id: hostCompetitionId,
         university_id: inviteUniversityId,
         invited_by: session.user.id,
+        participation_status: 'accepted',
+        invited_at: invitedAt,
+        responded_at: invitedAt,
       })
     setBusy(false)
     if (inviteError) {
-      setError(inviteError.code === '23505' ? 'That university has already been invited to this competition.' : `Invitation could not be sent: ${inviteError.message}`)
+      setError(inviteError.code === '23505' ? 'That university is already included in this competition.' : `University could not be added: ${inviteError.message}`)
       return
     }
     setInviteUniversityId('')
-    setNotice('Invitation sent. The invited university can accept it in their secretary portal.')
-    await load()
-  }
-
-  async function respondToInvitation(participation: Participation, accepted: boolean) {
-    if (!supabase) return
-    setBusy(true)
-    setError('')
-    setNotice('')
-    const { error: responseError } = await supabase.from('competition_participants').update({
-      participation_status: accepted ? 'accepted' : 'declined',
-      responded_at: new Date().toISOString(),
-    }).eq('competition_id', participation.competition_id).eq('university_id', participation.university_id)
-    setBusy(false)
-    if (responseError) {
-      setError(`Invitation response could not be saved: ${responseError.message}`)
-      return
-    }
-    setNotice(accepted ? 'Invitation accepted. Choose a team below to enter the competition.' : 'Invitation declined.')
+    setNotice('University added to the competition. Its class or university teams are now available in its portal.')
     await load()
   }
 
@@ -203,7 +196,7 @@ export function SecretaryLeaguePortal() {
   return (
     <section className="secretary-record-page slp-page">
       <div className="secretary-heading">
-        <div><span className="eyebrow">UNIVERSITY LEAGUE WORKSPACE</span><h1>Leagues &amp; invitations</h1><p>Organize a university competition or manage invitations your university has received.</p></div>
+        <div><span className="eyebrow">UNIVERSITY LEAGUE WORKSPACE</span><h1>Leagues &amp; invitations</h1><p>Organize a competition, add participating universities, or manage your university’s entries.</p></div>
       </div>
       {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
       {notice && <div className="inline-notice notice-success" role="status">{notice}</div>}
@@ -212,21 +205,21 @@ export function SecretaryLeaguePortal() {
         <>
           <div className="slp-summary">
             <div><Trophy size={17} /><span><strong>{hostedCompetitions.length}</strong><small>Organized by your university</small></span></div>
-            <div><MailPlus size={17} /><span><strong>{invitations.length}</strong><small>Invitations to review</small></span></div>
-            <div><Users size={17} /><span><strong>{acceptedParticipations.length}</strong><small>Competitions accepted</small></span></div>
+            <div><MailPlus size={17} /><span><strong>{addedUniversityIds.size}</strong><small>Universities added</small></span></div>
+            <div><Users size={17} /><span><strong>{acceptedParticipations.length}</strong><small>Competitions joined</small></span></div>
           </div>
 
           <div className="slp-columns">
             <section className="secretary-panel slp-panel">
               <div className="secretary-panel-heading"><div><span className="eyebrow">ORGANIZER</span><h2>Invite a university</h2></div><Building2 size={18} /></div>
-              <p className="slp-help">You organize a competition. Invite a college or university; its own secretary accepts and enters its team.</p>
+              <p className="slp-help">Add another university to your competition. It is immediately included and can manage its own teams and squads.</p>
               {hostedCompetitions.length ? (
                 <form className="secretary-record-form slp-form" onSubmit={(event) => void inviteUniversity(event)}>
                   <label className="secretary-field">Your competition<select required value={hostCompetitionId} onChange={(event) => setHostCompetitionId(event.target.value)}><option value="">Choose competition</option>{hostedCompetitions.map((competition) => <option key={competition.id} value={competition.id}>{competition.name} · {competition.season}</option>)}</select></label>
                   <label className="secretary-field">University to invite<select required value={inviteUniversityId} onChange={(event) => setInviteUniversityId(event.target.value)}><option value="">Choose university</option>{availableUniversities.map((university) => <option key={university.id} value={university.id}>{university.name}</option>)}</select></label>
-                  <button className="button button-primary" type="submit" disabled={busy || !inviteUniversityId}><MailPlus size={15} />Send invitation</button>
+                  <button className="button button-primary" type="submit" disabled={busy || !inviteUniversityId}><MailPlus size={15} />Add university</button>
                 </form>
-              ) : <div className="slp-empty-inline"><Trophy size={19} /><span>Create your competition first. You can then invite participating universities.</span><Link to="/secretary/competitions">Create competition <ArrowRight size={13} /></Link></div>}
+              ) : <div className="slp-empty-inline"><Trophy size={19} /><span>Create your competition first. You can then add participating universities.</span><Link to={universityPortalPath(basePath, '/competitions')}>Create competition <ArrowRight size={13} /></Link></div>}
               {hostedCompetitions.map((competition) => {
                 const guests = participations.filter((row) => row.competition_id === competition.id && row.university_id !== universityId)
                 const competitionEntries = entries.filter((entry) => entry.competition_id === competition.id)
@@ -238,7 +231,7 @@ export function SecretaryLeaguePortal() {
                       const universityEntries = competitionEntries.filter((entry) => entry.university_id === guest.university_id)
                       return <span key={guest.university_id}>
                         <span>{universitiesById[guest.university_id]?.name ?? 'University'}{universityEntries.length ? ` · ${universityEntries.map((entry) => teamsById(allEntryTeams, entry.team_id)).join(', ')}` : ''}</span>
-                        <i className={`slp-status slp-status-${guest.participation_status}`}>{guest.participation_status}</i>
+                        <i className={`slp-status slp-status-${guest.participation_status}`}>Added</i>
                       </span>
                     })}
                     {!guests.length && <small>No universities invited yet.</small>}
@@ -248,35 +241,32 @@ export function SecretaryLeaguePortal() {
             </section>
 
             <section className="secretary-panel slp-panel">
-              <div className="secretary-panel-heading"><div><span className="eyebrow">YOUR UNIVERSITY</span><h2>Invitations received</h2></div><MailPlus size={18} /></div>
-              <p className="slp-help">Accepting an invitation lets your university register one or more of its own teams.</p>
-              {invitations.length ? invitations.map((invitation) => {
-                const competition = competitionsById[invitation.competition_id]
-                return <div className="slp-invitation" key={invitation.competition_id}>
+              <div className="secretary-panel-heading"><div><span className="eyebrow">YOUR UNIVERSITY</span><h2>Competitions you have joined</h2></div><MailPlus size={18} /></div>
+              <p className="slp-help">These competitions have added your university. Choose your team in the section below.</p>
+              {acceptedParticipations.length ? acceptedParticipations.map((participation) => {
+                const competition = competitionsById[participation.competition_id]
+                return <div className="slp-invitation" key={participation.competition_id}>
                   <span className="slp-invitation-icon"><Trophy size={17} /></span>
                   <div><strong>{competition?.name ?? 'Competition invitation'}</strong><small>{universitiesById[competition?.university_id ?? '']?.name ?? 'Organizer'} · {competition?.season ?? ''}</small></div>
-                  <div className="slp-invitation-actions">
-                    <button className="button button-primary" type="button" disabled={busy} onClick={() => void respondToInvitation(invitation, true)}>Accept</button>
-                    <button className="button button-secondary" type="button" disabled={busy} onClick={() => void respondToInvitation(invitation, false)}>Decline</button>
-                  </div>
+                  <span className="slp-status slp-status-accepted">Added</span>
                 </div>
-              }) : <div className="slp-empty-inline"><CircleHelp size={19} /><span>No pending invitations. Accepted competitions and team entries appear below.</span></div>}
+              }) : <div className="slp-empty-inline"><CircleHelp size={19} /><span>No competitions have added your university yet.</span></div>}
             </section>
           </div>
 
           <section className="secretary-panel slp-panel slp-entries">
-            <div className="secretary-panel-heading"><div><span className="eyebrow">PARTICIPANT TEAMS</span><h2>Enter a team in an accepted competition</h2></div><Users size={18} /></div>
+            <div className="secretary-panel-heading"><div><span className="eyebrow">PARTICIPANT TEAMS</span><h2>Your teams in competitions</h2></div><Users size={18} /></div>
             <p className="slp-help">Your university retains ownership of all player profiles, team selection, and match squads. Class team eligibility is checked against each player’s academic year.</p>
             {acceptedParticipations.length ? (
               <form className="slp-entry-form" onSubmit={(event) => void registerTeam(event)}>
-                <label className="secretary-field">Accepted competition<select value={entryCompetitionId} onChange={(event) => { setEntryCompetitionId(event.target.value); setEntryTeamId('') }} required><option value="">Choose competition</option>{acceptedParticipations.map((participation) => {
+                <label className="secretary-field">Competition<select value={entryCompetitionId} onChange={(event) => { setEntryCompetitionId(event.target.value); setEntryTeamId('') }} required><option value="">Choose competition</option>{acceptedParticipations.map((participation) => {
                   const competition = competitionsById[participation.competition_id]
                   return <option key={participation.competition_id} value={participation.competition_id}>{competition?.name ?? 'Competition'} · {competition?.season ?? ''}</option>
                 })}</select></label>
                 <label className="secretary-field">Team to enter<select value={entryTeamId} onChange={(event) => setEntryTeamId(event.target.value)} required><option value="">Choose your team</option>{eligibleTeams.map((team) => <option key={team.id} value={team.id}>{team.name}{team.type === 'class_team' ? ` · ${team.academic_class ?? 'Class team'}` : ' · University team'}</option>)}</select></label>
                 <button className="button button-primary" type="submit" disabled={busy || !eligibleTeams.length}>Enter team</button>
               </form>
-            ) : <div className="slp-empty-inline"><Building2 size={19} /><span>Accept an invitation before entering your university team.</span></div>}
+            ) : <div className="slp-empty-inline"><Building2 size={19} /><span>Your university must be added to a competition before entering teams.</span></div>}
             {selectedCompetition && (
               <div className="slp-entry-list">
                 <h3>Teams entered in {selectedCompetition.name}</h3>

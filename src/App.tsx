@@ -7,6 +7,7 @@ import { AdminLayout } from './pages/admin/AdminLayout'
 import { DashboardPage } from './pages/admin/DashboardPage'
 import { LoginPage } from './pages/admin/LoginPage'
 import { UniversityCreatePage, UniversityDetailPage, UniversityListPage } from './pages/admin/UniversityPages'
+import { UniversityManagementPortal } from './pages/admin/UniversityManagementPortal'
 import { AcceptInvitationPage, ResetPasswordPage } from './pages/admin/ResetPasswordPage'
 import { PublicCompetitionsPage, PublicHomePage, PublicUniversitiesPage } from './pages/PublicPages'
 import { PublicPlayerDetailPage, PublicSquadDetailPage, PublicTeamDetailPage, PublicUniversityDetailPage } from './pages/PublicDetailPages'
@@ -72,6 +73,25 @@ function App() {
           <Route path="universities/new" element={<UniversityCreatePage />} />
           <Route path="universities/:id" element={<UniversityDetailPage />} />
           <Route path="news" element={<NewsManagementPage scope="platform" />} />
+        </Route>
+        <Route path="/admin/universities/:id/manage" element={<UniversityManagementPortal />}>
+          <Route element={<SecretaryLayout />}>
+            <Route index element={<SecretaryDashboardPage />} />
+            <Route path="team" element={<SecretaryUniversityTeamPage />} />
+            <Route path="class-teams" element={<SecretaryClassTeamsPage />} />
+            <Route path="announcements" element={<SecretaryAnnouncementsPage />} />
+            <Route path="leagues" element={<SecretaryLeaguePortal />} />
+            <Route path="competitions" element={<SecretaryRecordsPage kind="competitions" />} />
+            <Route path="teams" element={<SecretaryRecordsPage kind="teams" />} />
+            <Route path="players" element={<SecretaryRecordsPage kind="players" />} />
+            <Route path="matches" element={<SecretaryRecordsPage kind="matches" />} />
+            <Route path="control-center/*" element={<SecretaryControlCenter />} />
+            <Route path="news" element={<NewsManagementPage scope="university" />} />
+            <Route path="live" element={<SecretaryLiveMatchPage />} />
+            <Route path="standings" element={<SecretaryStandingsPage />} />
+            <Route path="statistics" element={<SecretaryStatisticsPage />} />
+            <Route path="settings" element={<SecretarySettingsPage />} />
+          </Route>
         </Route>
       </Route>
 
