@@ -21,7 +21,14 @@ site_url = "https://ahmad430875-gif.github.io/fotweb/"
 additional_redirect_urls = [
 	"http://localhost:5173/fotweb/",
 	"http://127.0.0.1:5173/fotweb/",
+	"http://localhost:3000/admin/login",
+	"http://localhost:3000/admin/reset-password",
+	"http://localhost:3001/admin/login",
+	"http://localhost:3001/admin/reset-password",
 	"https://ahmad430875-gif.github.io/fotweb/",
+	"https://miniature-robot-qv6v7xx9xwqghx7vw-3000.app.github.dev",
+	"https://miniature-robot-qv6v7xx9xwqghx7vw-3000.app.github.dev/admin/login",
+	"https://miniature-robot-qv6v7xx9xwqghx7vw-3000.app.github.dev/admin/reset-password",
 ]
 jwt_expiry = 3600
 enable_signup = false
