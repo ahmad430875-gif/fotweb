@@ -127,7 +127,11 @@ export function SecretaryControlCenter() {
       ])
       const failure = results.find((result) => result.error)
       if (failure?.error) {
-        if (active) setError(`Tournament data could not be loaded: ${failure.error.message}. Apply the institutional tournament control migration if these tables are missing.`)
+        const missingSchema = failure.error.code === 'PGRST205' || failure.error.message.includes('schema cache')
+        const recovery = missingSchema
+          ? 'Apply supabase/migrations/202610160001_institutional_tournament_control.sql to the linked Supabase project with `npx supabase db push`, then reload this page. If the migration is already applied, run `NOTIFY pgrst, \'reload schema\';` in the Supabase SQL Editor.'
+          : failure.error.message
+        if (active) setError(`Tournament data could not be loaded: ${recovery}`)
         return
       }
 

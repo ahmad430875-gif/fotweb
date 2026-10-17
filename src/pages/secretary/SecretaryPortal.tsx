@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDot, GraduationCap, LayoutDashboard, LogOut, MailPlus, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trophy, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, ChevronDown, ChevronRight, CircleDot, CircleHelp, GraduationCap, LayoutDashboard, LogOut, MailPlus, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trophy, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { FootballLogo } from '../../components/FootballLogo'
@@ -12,23 +12,59 @@ type Field = { name: string; label: string; type?: string; required?: boolean; o
 type Row = Record<string, unknown>
 type MatchRow = { id: string; home_team_id: string; away_team_id: string; competition_id: string; kickoff_at: string; status: string }
 
-const navigation = [
-  { to: '/secretary', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/secretary/team', label: 'University Team', icon: Building2 },
-  { to: '/secretary/class-teams', label: 'Class Teams', icon: GraduationCap },
-  { to: '/secretary/players', label: 'Players', icon: GraduationCap },
-  { to: '/secretary/announcements', label: 'Squad Announcements', icon: Megaphone },
-  { to: '/secretary/news', label: 'News Center', icon: Newspaper },
-  { to: '/secretary/competitions', label: 'Competitions', icon: Trophy },
-  { to: '/secretary/leagues', label: 'Leagues & Invitations', icon: MailPlus },
-  { to: '/secretary/teams', label: 'All Teams', icon: Users },
-  { to: '/secretary/matches', label: 'Fixtures & Results', icon: CalendarDays },
-  { to: '/secretary/control-center', label: 'Tournament Control', icon: ShieldCheck },
-  { to: '/secretary/live', label: 'Live Match Centre', icon: Radio },
-  { to: '/secretary/standings', label: 'Standings', icon: Table2 },
-  { to: '/secretary/statistics', label: 'Statistics', icon: BarChart3 },
-  { to: '/secretary/settings', label: 'Settings', icon: Settings },
+const navigationGroups = [
+  {
+    id: 'workspace',
+    label: 'Workspace',
+    items: [
+      { to: '/secretary', label: 'Overview', icon: LayoutDashboard, end: true },
+      { to: '/secretary/settings', label: 'Settings', icon: Settings },
+    ],
+  },
+  {
+    id: 'people',
+    label: 'People & teams',
+    items: [
+      { to: '/secretary/team', label: 'University Team', icon: Building2 },
+      { to: '/secretary/class-teams', label: 'Class Teams', icon: GraduationCap },
+      { to: '/secretary/players', label: 'Players', icon: GraduationCap },
+      { to: '/secretary/teams', label: 'All Teams', icon: Users },
+      { to: '/secretary/announcements', label: 'Squad Announcements', icon: Megaphone },
+    ],
+  },
+  {
+    id: 'competitions',
+    label: 'Competitions',
+    items: [
+      { to: '/secretary/competitions', label: 'Competitions', icon: Trophy },
+      { to: '/secretary/leagues', label: 'Leagues & Invitations', icon: MailPlus },
+    ],
+  },
+  {
+    id: 'matchday',
+    label: 'Matchday',
+    items: [
+      { to: '/secretary/matches', label: 'Fixtures & Results', icon: CalendarDays },
+      { to: '/secretary/control-center', label: 'Tournament Control', icon: ShieldCheck },
+      { to: '/secretary/live', label: 'Live Match Centre', icon: Radio },
+    ],
+  },
+  {
+    id: 'insights',
+    label: 'Insights & publishing',
+    items: [
+      { to: '/secretary/standings', label: 'Standings', icon: Table2 },
+      { to: '/secretary/statistics', label: 'Statistics', icon: BarChart3 },
+      { to: '/secretary/news', label: 'News Center', icon: Newspaper },
+    ],
+  },
 ]
+
+function navigationGroupForPath(pathname: string) {
+  return navigationGroups.find((group) => group.items.some(({ to }) =>
+    to === '/secretary' ? pathname === to : pathname === to || pathname.startsWith(`${to}/`),
+  ))?.id ?? 'workspace'
+}
 
 export function SecretaryLayout() {
   const { profile, session, signOut } = useAuth()
@@ -36,7 +72,14 @@ export function SecretaryLayout() {
   const navigate = useNavigate()
   const [universityName, setUniversityName] = useState('University workspace')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [navGroupState, setNavGroupState] = useState(() => ({
+    pathname: location.pathname,
+    openGroup: navigationGroupForPath(location.pathname),
+  }))
   const [signingOut, setSigningOut] = useState(false)
+  const openNavGroup = navGroupState.pathname === location.pathname
+    ? navGroupState.openGroup
+    : navigationGroupForPath(location.pathname)
 
   useEffect(() => {
     let active = true
@@ -67,12 +110,29 @@ export function SecretaryLayout() {
           <span className="secretary-campus-icon"><Building2 size={16} /></span>
           <span><strong>{universityName}</strong><small>Sports Secretary</small></span>
         </div>
-        <span className="secretary-nav-label">CAMPUS OPERATIONS</span>
         <nav className="secretary-nav" aria-label="University portal navigation">
-          {navigation.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} onClick={() => setMobileNavOpen(false)} className={({ isActive }) => `secretary-nav-link ${isActive ? 'secretary-nav-active' : ''}`}>
-              <Icon size={17} /><span>{label}</span>{label !== 'Overview' && <ChevronRight className="secretary-nav-chevron" size={14} />}
-            </NavLink>
+          {navigationGroups.map(({ id, label, items }) => (
+            <section className="secretary-nav-group" key={id}>
+              <button
+                className="secretary-nav-group-toggle"
+                type="button"
+                aria-expanded={openNavGroup === id}
+                aria-controls={`secretary-nav-${id}`}
+                onClick={() => setNavGroupState({
+                  pathname: location.pathname,
+                  openGroup: openNavGroup === id ? '' : id,
+                })}
+              >
+                <span>{label}</span><ChevronDown size={14} />
+              </button>
+              <div className="secretary-nav-group-links" id={`secretary-nav-${id}`} hidden={openNavGroup !== id}>
+                {items.map(({ to, label: itemLabel, icon: Icon, end }) => (
+                  <NavLink key={to} to={to} end={end} onClick={() => setMobileNavOpen(false)} className={({ isActive }) => `secretary-nav-link ${isActive ? 'secretary-nav-active' : ''}`}>
+                    <Icon size={17} /><span>{itemLabel}</span><ChevronRight className="secretary-nav-chevron" size={14} />
+                  </NavLink>
+                ))}
+              </div>
+            </section>
           ))}
         </nav>
         <div className="secretary-sidebar-note"><span className="secretary-live-dot" /><span>University data is private to this workspace.</span></div>
@@ -98,7 +158,7 @@ export function SecretaryLayout() {
               <Menu size={19} />
             </button>
             <div className="secretary-breadcrumb">
-              <span>University</span><span>/</span><strong>{location.pathname.startsWith('/secretary/control-center') ? 'Tournament Control' : navigation.find((item) => item.to === location.pathname)?.label ?? (location.pathname === '/secretary/news' ? 'News Center' : 'Operations')}</strong>
+              <span>University</span><span>/</span><strong>{location.pathname.startsWith('/secretary/control-center') ? 'Tournament Control' : navigationGroups.flatMap(({ items }) => items).find((item) => item.to === location.pathname)?.label ?? 'Operations'}</strong>
             </div>
           </div>
           <div className="secretary-topbar-actions"><span className="secretary-secure"><i /> University access</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div>
@@ -208,6 +268,16 @@ export function SecretaryDashboardPage() {
       </div>
       {!supabase && <div className="inline-notice notice-warning"><CircleDot size={17} /><span>Connect Supabase to load university data.</span></div>}
       {error && <div className="inline-notice notice-error" role="alert">{error}</div>}
+      <details className="secretary-first-steps">
+        <summary><CircleHelp size={17} /><span><strong>New to the portal?</strong><small>Follow these steps to set up your first competition.</small></span><ChevronDown size={16} /></summary>
+        <ol>
+          <li><Link to="/secretary/teams">Create your university or class team</Link><span>Choose the team type that matches your competition.</span></li>
+          <li><Link to="/secretary/players">Add players and confirm enrollment</Link><span>Enter student details and mark eligible players as actively enrolled.</span></li>
+          <li><Link to="/secretary/competitions">Create a competition</Link><span>Set its season, format, and dates before entering teams.</span></li>
+          <li><Link to="/secretary/leagues">Invite universities or enter your team</Link><span>Use Leagues &amp; Invitations to join or organize a shared competition.</span></li>
+          <li><Link to="/secretary/matches">Schedule fixtures</Link><span>Set teams, kick-off time, and venue; then publish when ready.</span></li>
+        </ol>
+      </details>
       <div className="secretary-metric-grid">
         {metrics.map(({ label, value, icon: Icon, tone, href }) => (
           <Link className="secretary-metric" to={href} key={label}>

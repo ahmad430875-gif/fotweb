@@ -83,6 +83,19 @@ npx supabase db push
 
 Replace `YOUR_PROJECT_REF` with the project reference shown in the Supabase project URL. Review the migration list before pushing. If migrations were previously run manually in the Supabase SQL Editor, do not blindly run the SQL files again or push untracked migrations; first reconcile the project's migration history with the database.
 
+The Tournament Control workspace requires `202610160001_institutional_tournament_control.sql`. If the portal reports that `public.match_brackets` is missing, confirm that migration is applied to the same project used by the app. If it is listed as applied but PostgREST still reports a schema-cache error, run `NOTIFY pgrst, 'reload schema';` in the Supabase SQL Editor and reload the portal.
+
+### Deploy university invitations
+
+The Sports Secretary invitation and password-reset links must return to the app's `/fotweb/` base path. Configure the hosted Edge Function with the public app URL, add that exact URL to Supabase Auth's allowed redirect URLs, then deploy the function:
+
+```bash
+npx supabase secrets set APP_URL=https://ahmad430875-gif.github.io/fotweb/
+npx supabase functions deploy manage-secretary
+```
+
+For local development, set `APP_URL` to `http://localhost:5173/fotweb/` and add it to the Auth redirect URL allow list. The function falls back to the request host plus `/fotweb/` when `APP_URL` is not set.
+
 5) Build and preview checks
 
 ```bash

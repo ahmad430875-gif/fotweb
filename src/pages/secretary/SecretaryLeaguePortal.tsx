@@ -59,7 +59,12 @@ export function SecretaryLeaguePortal() {
     ])
     const initialFailure = [ownedResult, participationResult, universityResult, teamResult].find((result) => result.error)
     if (initialFailure?.error) {
-      setError(`League workspace could not be loaded: ${initialFailure.error.message}. Apply the multi-university competition migration and try again.`)
+      const missingInvitations = initialFailure.error.message.includes('competition_participants')
+        && (initialFailure.error.code === 'PGRST205' || initialFailure.error.message.includes('schema cache'))
+      const recovery = missingInvitations
+        ? 'The university invitation tables are missing. Apply supabase/migrations/202610160002_multi_university_competitions.sql to the linked project with `npx supabase db push`, then reload. If already applied, run `NOTIFY pgrst, \'reload schema\';` in the Supabase SQL Editor.'
+        : `${initialFailure.error.message}. Apply the multi-university competition migration and try again.`
+      setError(`League workspace could not be loaded: ${recovery}`)
       setLoading(false)
       return
     }

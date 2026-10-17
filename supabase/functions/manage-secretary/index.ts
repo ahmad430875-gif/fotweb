@@ -21,11 +21,14 @@ function getBearerToken(request: Request) {
   return value.match(/^Bearer\s+(.+)$/i)?.[1] ?? null
 }
 
-function getAppOrigin(request: Request) {
-  const value = Deno.env.get('APP_URL')?.trim() || request.headers.get('origin')
-  if (!value) return null
+function getAppRedirectUrl(request: Request) {
+  const configuredUrl = Deno.env.get('APP_URL')?.trim()
+  const origin = request.headers.get('origin')
   try {
-    const url = new URL(value)
+    const url = configuredUrl
+      ? new URL(configuredUrl)
+      : origin ? new URL('/fotweb/', origin) : null
+    if (!url) return null
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
     return `${url.origin}${url.pathname.replace(/\/+$/, '')}/`
   } catch {
@@ -103,13 +106,19 @@ Deno.serve(async (request) => {
     if (existingError) return respond(500, { error: 'The existing Secretary account could not be checked.' })
     if (existing) return respond(409, { error: 'This university already has an active Sports Secretary.' })
 
-    const appUrl = getAppOrigin(request)
+    const appUrl = getAppRedirectUrl(request)
     if (!appUrl) return respond(500, { error: 'The invitation redirect URL is not configured.' })
     const { data: invitation, error: inviteError } = await service.auth.admin.inviteUserByEmail(email, {
       redirectTo: appUrl,
       data: { display_name: '' },
     })
-    if (inviteError || !invitation.user) return respond(400, { error: 'The invite could not be sent. Check whether this email already has an account.' })
+    if (inviteError) {
+      const message = inviteError.message.toLowerCase().includes('already registered')
+        ? 'This email already has an account. Use an unused email address or manage the existing Secretary account.'
+        : `The invitation email could not be sent: ${inviteError.message}`
+      return respond(400, { error: message })
+    }
+    if (!invitation.user) return respond(500, { error: 'The invitation email was accepted, but no account was created. Check the Supabase Auth logs before retrying.' })
 
     const { error: profileError } = await service.from('user_profiles').insert({
       id: invitation.user.id,
@@ -140,7 +149,7 @@ Deno.serve(async (request) => {
   if (body.action === 'reset') {
     const { data: userData, error: userError } = await service.auth.admin.getUserById(secretary.id)
     if (userError || !userData.user?.email) return respond(404, { error: 'Secretary email address could not be found.' })
-    const appUrl = getAppOrigin(request)
+    const appUrl = getAppRedirectUrl(request)
     if (!appUrl) return respond(500, { error: 'The password reset redirect URL is not configured.' })
     const { error } = await service.auth.resetPasswordForEmail(userData.user.email, {
       redirectTo: appUrl,
