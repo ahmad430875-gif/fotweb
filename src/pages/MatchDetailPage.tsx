@@ -3,6 +3,7 @@ import { Activity, ArrowLeft, ArrowRight, CalendarDays, CircleDot, Clock3, Goal,
 import { Link, useParams } from 'react-router-dom'
 import { PublicFrame } from './PublicPages'
 import { supabase } from '../lib/supabase'
+import { publicImageUrl } from '../lib/imageUrl'
 
 type Match = { id: string; competition_id: string; home_team_id: string; away_team_id: string; kickoff_at: string; status: string; home_score: number; away_score: number; round: string | null; venue: string | null; referee: string | null }
 type Side = { id: string; name: string; short_name: string; logo_url: string | null; university_id: string }
@@ -239,7 +240,7 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
 }
 
 function TeamIdentity({ team, fallback }: { team?: Side; fallback: string }) {
-  const badge = <span className="mc-team-badge">{team?.logo_url ? <img src={team.logo_url} alt="" /> : <Shield size={27} />}</span>
+  const badge = <span className="mc-team-badge">{team?.logo_url ? <img src={publicImageUrl(team.logo_url)} alt="" /> : <Shield size={27} />}</span>
   return <div className="mc-team-identity">
     {team ? <Link to={`/teams/${team.id}`} aria-label={`${team.name} team page`}>{badge}</Link> : badge}
     <strong>{team?.name ?? fallback}</strong>

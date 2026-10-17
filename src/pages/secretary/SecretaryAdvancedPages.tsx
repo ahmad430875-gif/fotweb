@@ -3,6 +3,7 @@ import { Activity, CalendarDays, CircleDot, Shield, Trophy, Users } from 'lucide
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { supabase } from '../../lib/supabase'
+import { publicImageUrl } from '../../lib/imageUrl'
 
 type University = { id: string; name: string; short_name: string }
 type Team = { 
@@ -307,9 +308,11 @@ export function SecretaryUniversityTeamPage() {
                   <input 
                     type={type} 
                     value={form[name]} 
+                    placeholder={type === 'url' ? 'Paste a public image URL or Google Drive share link' : undefined}
                     onChange={(event) => change(name, event.target.value)} 
                     required={name === 'name' || name === 'short_name'} 
                   />
+                  {type === 'url' && form[name] && <span className="url-image-preview"><img src={publicImageUrl(form[name])} alt={`${label} preview`} /><small>{label} preview · public URLs only</small></span>}
                 </label>
               ))}
 
@@ -418,7 +421,7 @@ export function SecretaryUniversityTeamPage() {
                         <tr key={registrationId}>
                           <td>
                             <span className="secretary-player-cell">
-                              {player.photo_url && <img src={player.photo_url} alt="" />}
+                              {player.photo_url && <img src={publicImageUrl(player.photo_url)} alt="" />}
                               <strong>{player.full_name}</strong>
                             </span>
                           </td>

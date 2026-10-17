@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useAuth } from '../../auth/AuthProvider'
 import { FootballLogo } from '../../components/FootballLogo'
 import { supabase } from '../../lib/supabase'
+import { publicImageUrl } from '../../lib/imageUrl'
 import './SecretaryPortal.css'
 
 type RecordKind = 'competitions' | 'teams' | 'players' | 'matches'
@@ -349,6 +350,8 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
     { name: 'points_for_draw', label: 'Points for draw', type: 'number', required: true, placeholder: '1' },
     { name: 'points_for_loss', label: 'Points for loss', type: 'number', required: true, placeholder: '0' },
     { name: 'venue', label: 'Primary venue', full: true },
+    { name: 'logo_url', label: 'Competition logo URL', type: 'url', placeholder: 'Paste a public image URL or Google Drive share link' },
+    { name: 'banner_url', label: 'Competition banner URL', type: 'url', placeholder: 'Paste a public image URL or Google Drive share link', full: true },
   ],
   teams: [
     { name: 'name', label: 'Team name', required: true },
@@ -360,7 +363,7 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
   players: [
     { name: 'full_name', label: 'Player full name', required: true, full: true },
     { name: 'student_identifier', label: 'Student ID / identifier' },
-    { name: 'photo_url', label: 'Player photo URL', type: 'url' },
+    { name: 'photo_url', label: 'Player photo URL', type: 'url', placeholder: 'Paste a public image URL or Google Drive share link' },
     { name: 'academic_program', label: 'Academic program', type: 'select', options: optionSets.academicProgram },
     { name: 'current_academic_year', label: 'Academic year', type: 'select', options: optionSets.academicYear },
     { name: 'batch_session', label: 'Batch / session', placeholder: 'e.g. 2024–2029' },
@@ -383,7 +386,7 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
 }
 
 const pageCopy: Record<RecordKind, { title: string; description: string; table: string; select: string; order: string; columns: string[] }> = {
-  competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, name, season, type, format, status, start_date, end_date, is_primary, is_locked', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
+  competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, name, season, type, format, status, start_date, end_date, ended_at, is_primary, is_locked', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
   teams: { title: 'Teams', description: 'Manage university and class teams, then register them in competitions.', table: 'teams', select: 'id, name, short_name, type, academic_class, batch_session, is_active, is_locked', order: 'name', columns: ['name', 'short_name', 'type', 'academic_class', 'batch_session', 'is_active'] },
   players: { title: 'Players', description: 'Edit one permanent student profile used across every team and competition.', table: 'players', select: 'id, full_name, student_identifier, photo_url, academic_program, current_academic_year, batch_session, academic_enrollment_status, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'academic_program', 'current_academic_year', 'batch_session', 'academic_enrollment_status', 'position', 'injury_status', 'is_available'] },
   matches: { title: 'Fixtures', description: 'Schedule, publish, and prepare fixtures for the live match centre.', table: 'matches', select: 'id, competition_id, home_team_id, away_team_id, kickoff_at, status, round, venue, referee, published_at, is_locked', order: 'kickoff_at', columns: ['kickoff_at', 'home_team_id', 'away_team_id', 'status'] },
@@ -402,6 +405,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   const [managedCompetitionOptions, setManagedCompetitionOptions] = useState<Option[]>([])
   const [teamRegistration, setTeamRegistration] = useState({ team_id: '', competition_id: '' })
   const [editingRow, setEditingRow] = useState<Row | null>(null)
+  const [urlPreviews, setUrlPreviews] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -541,13 +545,36 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     setBusy(false)
     if (saveResult.error) { setError(friendlyRecordError(saveResult.error)); return }
     form.reset()
+    setUrlPreviews({})
     setNotice(editingRow ? 'Player profile updated everywhere this permanent profile is used.' : `${singularLabels[kind][0].toUpperCase()}${singularLabels[kind].slice(1)} added.`)
     setEditingRow(null)
     await loadRows()
   }
 
+  async function updateCompetitionLifecycle(row: Row, action: 'publish' | 'end') {
+    if (!supabase || kind !== 'competitions') return
+    if (action === 'end' && !window.confirm(`End ${String(row.name)}? Every fixture must be complete. Ending is permanent and makes all tournament data read-only.`)) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const update = action === 'publish'
+      ? { status: 'published' }
+      : { ended_at: new Date().toISOString() }
+    const { error: updateError } = await supabase.from('competitions').update(update).eq('id', String(row.id)).eq('university_id', universityId)
+    setBusy(false)
+    if (updateError) {
+      setError(updateError.message.includes('Every fixture')
+        ? 'Finish or cancel every fixture in Tournament Control before ending this competition.'
+        : `Competition could not be ${action === 'publish' ? 'published' : 'ended'}: ${updateError.message}`)
+      return
+    }
+    setNotice(action === 'publish' ? 'Competition published and visible on public pages.' : 'Tournament ended. Its records are now permanently read-only.')
+    await loadRows()
+  }
+
   function editPlayer(row: Row) {
     setEditingRow(row)
+    setUrlPreviews({ photo_url: String(row.photo_url ?? '') })
     setError('')
     setNotice('')
   }
@@ -645,12 +672,15 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
                       {field.options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
                     </select>
                   ) : (
-                    <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} defaultValue={String(editingRow?.[field.name] ?? '')} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />
+                    <>
+                      <input name={field.name} type={field.type ?? 'text'} placeholder={field.placeholder} defaultValue={String(editingRow?.[field.name] ?? '')} onChange={field.type === 'url' ? (event) => setUrlPreviews((current) => ({ ...current, [field.name]: event.target.value })) : undefined} required={field.required} minLength={field.required && field.type !== 'date' && field.type !== 'datetime-local' ? 2 : undefined} />
+                      {field.type === 'url' && (urlPreviews[field.name] ?? String(editingRow?.[field.name] ?? '')) && <span className="url-image-preview"><img src={publicImageUrl(urlPreviews[field.name] ?? String(editingRow?.[field.name]))} alt={`${field.label} preview`} /><small>Image preview · public URLs only</small></span>}
+                    </>
                   )}
                 </label>
               ))}
             </div>
-            {kind === 'competitions' && <p className="secretary-form-note">New competitions are saved as drafts. A platform administrator publishes them.</p>}
+            {kind === 'competitions' && <p className="secretary-form-note">New competitions start as drafts. Publish when they are ready for participants and public pages; end only after every fixture is complete or cancelled.</p>}
             {kind === 'matches' && (!teamOptions.length || !competitionOptions.length) && <p className="secretary-form-note">Add at least one competition and two teams before scheduling a fixture.</p>}
             <button className="button button-primary" type="submit" disabled={busy || (kind === 'matches' && (!teamOptions.length || !competitionOptions.length))}>
               {busy ? 'Saving…' : editingRow ? 'Save player profile' : `Save ${singularLabels[kind]}`}
@@ -681,15 +711,25 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             <div className="secretary-table-wrap">
               <table className="secretary-table">
                 <thead>
-                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}{(kind === 'players' || kind === 'teams') && <th>Actions</th>}</tr>
+                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}{kind === 'competitions' && <th>Actions</th>}{(kind === 'players' || kind === 'teams') && <th>Actions</th>}</tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={String(row.id)}>
-                      {config.columns.map((column) => <td key={column}>{formatCell(kind, column, row[column], names, competitions)}</td>)}
+                      {config.columns.map((column) => <td key={column}>{kind === 'competitions' && column === 'status'
+                        ? row.ended_at ? 'Ended' : String(row.status).replaceAll('_', ' ')
+                        : formatCell(kind, column, row[column], names, competitions)}</td>)}
                       {kind === 'matches' && <td>{managedCompetitionOptions.some((option) => option.value === String(row.competition_id))
                         ? <button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button>
                         : <span>Organizer controls publication</span>}</td>}
+                      {kind === 'competitions' && <td>
+                        {row.ended_at ? <span className="competition-ended-label">Ended · read-only</span>
+                          : row.status === 'draft'
+                            ? <button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void updateCompetitionLifecycle(row, 'publish')}>Publish competition</button>
+                            : row.status === 'published'
+                              ? <button className="secretary-text-action competition-end-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => void updateCompetitionLifecycle(row, 'end')}>End tournament</button>
+                              : <span>{String(row.status).replaceAll('_', ' ')}</span>}
+                      </td>}
                       {kind === 'players' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked)} onClick={() => editPlayer(row)}>Edit profile</button></td>}
                       {kind === 'teams' && <td><button className="secretary-text-action" type="button" disabled={busy || Boolean(row.is_locked) || !nextAcademicYear(String(row.academic_class ?? ''))} onClick={() => void promoteClassTeam(row)}>{nextAcademicYear(String(row.academic_class ?? '')) ? `Promote to ${nextAcademicYear(String(row.academic_class))}` : row.type === 'class_team' ? 'No next year' : 'University team'}</button></td>}
                     </tr>
@@ -719,6 +759,8 @@ function buildPayload(kind: RecordKind, values: FormData, universityId: string, 
     points_for_win: Number(text('points_for_win') || 3),
     points_for_draw: Number(text('points_for_draw') || 1),
     points_for_loss: Number(text('points_for_loss') || 0),
+    logo_url: text('logo_url') || null,
+    banner_url: text('banner_url') || null,
     status: 'draft',
   }
   if (kind === 'teams') return { ...base, name: text('name'), short_name: text('short_name'), type: text('type'), academic_class: text('type') === 'class_team' ? text('academic_class') : null, batch_session: text('batch_session') || null }

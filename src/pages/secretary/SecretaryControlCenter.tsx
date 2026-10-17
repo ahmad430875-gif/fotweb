@@ -7,8 +7,24 @@ import { InstitutionalEligibilityCheck } from './InstitutionalEligibilityCheck'
 import { TournamentBracketView, type BracketFixture, type BracketRound } from './TournamentBracketView'
 import './SecretaryControlCenter.css'
 
-type Competition = { id: string; name: string; season: string }
-type Team = { id: string; name: string }
+type Competition = { id: string; name: string; season: string; ended_at: string | null }
+type Team = { id: string; name: string; group_name: string | null }
+type GroupStanding = {
+  position: number
+  competition_id: string
+  group_name: string
+  team_id: string
+  team_name: string
+  played: number
+  wins: number
+  draws: number
+  losses: number
+  goals_for: number
+  goals_against: number
+  goal_difference: number
+  points: number
+  qualified: boolean
+}
 type Player = { id: string; full_name: string; batch_session: string | null; is_active: boolean }
 type Stage = { id: string; name: string; stage_type: 'group' | 'knockout' | 'league'; sequence_order: number }
 type Round = { id: string; name: string; round_number: number; stage_id: string }
@@ -45,6 +61,7 @@ export function SecretaryControlCenter() {
   const [stages, setStages] = useState<Stage[]>([])
   const [rounds, setRounds] = useState<Round[]>([])
   const [matches, setMatches] = useState<Match[]>([])
+  const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([])
   const [cards, setCards] = useState<MatchCard[]>([])
   const [locks, setLocks] = useState<SquadLock[]>([])
   const [officials, setOfficials] = useState<MatchOfficials[]>([])
@@ -72,6 +89,10 @@ export function SecretaryControlCenter() {
       ...round,
       fixtures: matches.filter((match) => match.round_id === round.id),
     })), [matches, rounds, selectedStage])
+  const groupTables = useMemo(() => groupStandings.reduce<Record<string, GroupStanding[]>>((groups, row) => {
+    ;(groups[row.group_name] ??= []).push(row)
+    return groups
+  }, {}), [groupStandings])
   const activeLock = locks.find((lock) => lock.team_id === selectedTeamId && lock.competition_id === competitionId)
   const selectedOfficials = officials.find((official) => official.match_id === selectedMatchId)
 
@@ -85,7 +106,7 @@ export function SecretaryControlCenter() {
       setLoading(true)
       const { data, error: loadError } = await supabase
         .from('competitions')
-        .select('id, name, season')
+        .select('id, name, season, ended_at')
         .eq('university_id', universityId)
         .order('start_date', { ascending: false })
       if (!active) return
@@ -109,6 +130,7 @@ export function SecretaryControlCenter() {
         setStages([])
         setRounds([])
         setMatches([])
+        setGroupStandings([])
         setTeams([])
         setPlayers([])
         setCards([])
@@ -120,10 +142,11 @@ export function SecretaryControlCenter() {
       const results = await Promise.all([
         supabase.from('tournament_stages').select('id, name, stage_type, sequence_order').eq('competition_id', competitionId).order('sequence_order'),
         supabase.from('match_brackets').select('id, round_id, home_team_id, away_team_id, home_score, away_score, match_status, winner_team_id, match_date, next_match_id, venue').eq('competition_id', competitionId).order('match_date'),
-        supabase.from('competition_teams').select('team_id').eq('competition_id', competitionId),
+        supabase.from('competition_teams').select('team_id, group_name').eq('competition_id', competitionId),
         supabase.from('player_registrations').select('player_id').eq('competition_id', competitionId).is('released_at', null),
         supabase.from('match_cards').select('id, player_id, match_id, card_type, issued_at, suspension_served_at').eq('competition_id', competitionId).order('issued_at', { ascending: false }),
         supabase.from('squad_locks').select('id, team_id, competition_id, is_locked, locked_at').eq('competition_id', competitionId),
+        supabase.from('competition_group_standings').select('position, competition_id, group_name, team_id, team_name, played, wins, draws, losses, goals_for, goals_against, goal_difference, points, qualified').eq('competition_id', competitionId).order('group_name').order('position'),
       ])
       const failure = results.find((result) => result.error)
       if (failure?.error) {
@@ -165,10 +188,13 @@ export function SecretaryControlCenter() {
       setStages(stageRows)
       setRounds(roundRows)
       setMatches(fixtureRows)
-      setTeams((teamResult.data ?? []) as Team[])
+      const groupsByTeam = new Map((results[2].data ?? []).map((row) => [row.team_id, row.group_name]))
+      setTeams(((teamResult.data ?? []) as Array<Omit<Team, 'group_name'>>)
+        .map((team) => ({ ...team, group_name: groupsByTeam.get(team.id) ?? null })))
       setPlayers((playerResult.data ?? []) as Player[])
       setCards((results[4].data ?? []) as MatchCard[])
       setLocks((results[5].data ?? []) as SquadLock[])
+      setGroupStandings((results[6].data ?? []) as GroupStanding[])
       setOfficials((officialsResult.data ?? []) as MatchOfficials[])
       setSelectedStageId((current) => stageRows.some((row) => row.id === current) ? current : stageRows[0]?.id ?? '')
       setSelectedTeamId((current) => teamIds.includes(current) ? current : teamIds[0] ?? '')
@@ -229,6 +255,41 @@ export function SecretaryControlCenter() {
       return
     }
     if (await runAction(async () => await client.from('tournament_rounds').insert({ stage_id: selectedStageId, name, round_number: number }), 'Tournament round created.')) formElement.reset()
+  }
+
+  async function saveTeamGroup(teamId: string) {
+    if (!supabase || !competitionId) return
+    const team = teams.find((row) => row.id === teamId)
+    if (!team) return
+    const client = supabase
+    await runAction(async () => {
+      const { error } = await client.rpc('assign_competition_team_group', {
+        target_competition: competitionId,
+        target_team: teamId,
+        target_group: team.group_name ?? '',
+      })
+      return { error }
+    }, 'Team group saved.')
+  }
+
+  async function seedGroupQualifiers() {
+    if (!supabase || !competitionId || !selectedStageId) return
+    const client = supabase
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const { data: knockoutStageId, error: seedError } = await client.rpc('seed_group_qualifiers', {
+      target_competition: competitionId,
+      source_stage: selectedStageId,
+    })
+    setBusy(false)
+    if (seedError) {
+      setError(seedError.message)
+      return
+    }
+    setSelectedStageId(knockoutStageId)
+    setNotice('Top four teams from each group have been seeded into the knockout bracket.')
+    setRefreshKey((key) => key + 1)
   }
 
   async function createFixture(event: FormEvent<HTMLFormElement>) {
@@ -388,6 +449,17 @@ export function SecretaryControlCenter() {
             {!rounds.length && <li className="tcc-list-empty">Add a stage before creating rounds.</li>}
           </ol>
         </section>
+        <section className="tcc-panel tcc-group-assignment">
+          <div className="tcc-panel-title"><div><span className="eyebrow">GROUP STAGE</span><h2>Assign teams to groups</h2></div><Users size={18} /></div>
+          <p className="tcc-step-help">Give every participating team a group name (for example, A or B). Completed group fixtures will build each table and mark its top four as qualified.</p>
+          {teams.length ? <div className="tcc-group-assignment-list">
+            {teams.map((team) => <div className="tcc-group-assignment-row" key={team.id}>
+              <strong>{team.name}</strong>
+              <label className="tcc-field"><span className="sr-only">Group for {team.name}</span><input aria-label={`Group for ${team.name}`} value={team.group_name ?? ''} maxLength={80} placeholder="Group A" onChange={(event) => setTeams((current) => current.map((row) => row.id === team.id ? { ...row, group_name: event.target.value } : row))} /></label>
+              <button className="button button-secondary" type="button" disabled={busy || Boolean(competition?.ended_at)} onClick={() => void saveTeamGroup(team.id)}>Save group</button>
+            </div>)}
+          </div> : <div className="tcc-empty-inline"><Users size={18} /><span>Register participating teams before assigning groups.</span></div>}
+        </section>
       </div>
     )
   }
@@ -411,6 +483,23 @@ export function SecretaryControlCenter() {
         <section className="tcc-panel">
           <div className="tcc-panel-title"><div><span className="eyebrow">BRACKET</span><h2>Fixture progression</h2></div><Users size={18} /></div>
           <label className="tcc-field tcc-stage-filter">Stage<select value={selectedStageId} onChange={(event) => setStage(event.target.value)}><option value="">Select stage</option>{stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
+          {selectedStage?.stage_type === 'group' && (
+            <section className="tcc-qualification-panel">
+              <div className="tcc-qualification-heading"><div><span className="eyebrow">QUALIFICATION</span><h3>Group tables</h3></div><span>Top 4 advance</span></div>
+              {Object.keys(groupTables).length ? <div className="tcc-group-tables">{Object.entries(groupTables).map(([groupName, rows]) => (
+                <div className="tcc-group-table" key={groupName}>
+                  <h4>Group {groupName}</h4>
+                  <div className="tcc-group-table-scroll"><table><thead><tr><th>#</th><th>Team</th><th>PL</th><th>GD</th><th>PTS</th><th>Advance</th></tr></thead><tbody>
+                    {rows.map((row) => <tr className={row.qualified ? 'tcc-group-qualified' : ''} key={row.team_id}>
+                      <td>{row.position}</td><td>{row.team_name}</td><td>{row.played}</td><td>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</td><td><strong>{row.points}</strong></td><td>{row.qualified ? 'Qualified' : '—'}</td>
+                    </tr>)}
+                  </tbody></table></div>
+                </div>
+              ))}</div> : <p className="tcc-step-help">Assign teams to groups, then record completed group-stage results to populate the tables.</p>}
+              <p className="tcc-step-help">When every group fixture is complete, seed qualified teams into the first knockout round. A single group creates semi-finals; paired groups are cross-seeded by position.</p>
+              <button className="button button-primary" type="button" disabled={busy || Boolean(competition?.ended_at) || !Object.keys(groupTables).length} onClick={() => void seedGroupQualifiers()}><Flag size={15} />Qualify top four &amp; seed bracket</button>
+            </section>
+          )}
           <TournamentBracketView rounds={bracketRounds} teamNames={teamNames} fixtureNames={matchNames} onSelectFixture={setSelectedMatchId} />
         </section>
         {selectedMatch && (
@@ -543,10 +632,10 @@ export function SecretaryControlCenter() {
         <label className="tcc-field">Working competition
           <select value={competitionId} onChange={(event) => setCompetitionId(event.target.value)} disabled={loading}>
             <option value="">Select competition</option>
-            {competitions.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.season}</option>)}
+            {competitions.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.season}{item.ended_at ? ' · Ended' : ''}</option>)}
           </select>
         </label>
-        <span>{competition ? `${competition.name} · ${stages.length} stages · ${matches.length} fixtures` : 'Your changes apply only to this university competition.'}</span>
+        <span>{competition ? `${competition.name} · ${stages.length} stages · ${matches.length} fixtures${competition.ended_at ? ' · Ended and read-only' : ''}` : 'Your changes apply only to this university competition.'}</span>
       </div>
 
       {competition && (
@@ -567,6 +656,8 @@ export function SecretaryControlCenter() {
           <span>Choose a competition above to manage its tournament. No competitions yet?</span>
           <Link className="button button-primary" to="/secretary/competitions">Open competitions</Link>
         </div>
+      ) : competition.ended_at ? (
+        <div className="tcc-panel tcc-ended-state"><LockKeyhole size={23} /><strong>Tournament ended</strong><span>This competition and all its tournament records are permanently read-only. Published results remain available to the public.</span></div>
       ) : !activeStep ? (
         <div className="tcc-overview">
           <div className="tcc-welcome-card"><span className="tcc-welcome-icon"><ClipboardList size={21} /></span><div><strong>{competition.name}</strong><span>{competition.season} · This workspace is private to your university.</span></div><span className="tcc-overview-count">{stages.length} stages · {matches.length} fixtures</span></div>

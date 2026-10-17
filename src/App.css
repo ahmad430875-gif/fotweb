@@ -678,3 +678,47 @@
 @media(max-width:820px){.news-center-grid{grid-template-columns:1fr}.news-editor{order:0}.news-list-panel{order:1}}
 @media(max-width:720px){.league-centre{width:calc(100% - 28px);padding-top:18px}.league-hero{grid-template-columns:auto minmax(0,1fr);gap:12px;padding:14px 0 17px}.league-badge{width:49px;height:49px}.league-hero-copy h1{font-size:22px}.league-hero-copy p{font-size:10px}.league-hero-actions{grid-column:1/-1;justify-content:flex-end}.league-season-select{margin-right:auto}.league-tabs{top:0}.league-tab{min-height:43px;padding:0 12px;font-size:11px}.league-table{min-width:850px}.league-fixture-row{grid-template-columns:53px minmax(0,1fr) 64px minmax(0,1fr);gap:6px;padding:8px}.league-kickoff{font-size:9px}.league-fixture-side{gap:4px}.league-fixture-side strong{font-size:9px}.league-team-badge{width:20px;height:20px}.league-fixture-score{font-size:10px}.league-fixture-venue{font-size:8px}.league-leaderboard-grid,.league-team-stats-grid,.league-news-grid{grid-template-columns:1fr}.league-season-range{font-size:9px}}
 @media(max-width:480px){.news-context-grid{grid-template-columns:1fr}.news-match-field{grid-column:auto}.news-article-row{align-items:flex-start;gap:8px}.news-article-actions{flex-direction:column}.news-article-actions .icon-button{width:31px;height:31px}.league-section-heading h2{font-size:18px}.league-season-row{gap:8px;padding-inline:8px}.league-season-range{display:none}.league-follow{padding-inline:9px}.league-season-select select{max-width:130px}.portal-logout{min-height:32px;padding-inline:8px;font-size:10px}.secretary-topbar-actions{gap:7px}}
+.url-image-preview{width:max-content;max-width:100%;display:flex;align-items:center;gap:9px;margin-top:7px;padding:7px;border:1px solid #d9e3de;border-radius:5px;background:#f7faf8}
+.url-image-preview img{width:58px;height:48px;object-fit:contain;border-radius:3px;background:#fff}
+.url-image-preview small{color:#5c6b64;font-size:9px;font-weight:500;line-height:1.4}
+.secretary-accounts-list{display:flex;flex-direction:column;gap:9px}
+.secretary-accounts-list .secretary-account{flex-wrap:wrap}
+.secretary-security-note{margin:0;color:#5c6b64;font-size:10px;line-height:1.55}
+.secretary-replace{margin-top:14px;padding-top:14px;border-top:1px solid #e7eeea}
+.competition-ended-label{color:#5c6b64;font-size:11px;font-weight:700}
+.competition-end-action{color:#a84f55}
+.tcc-group-assignment{grid-column:1/-1}
+.tcc-group-assignment-list{display:flex;flex-direction:column;gap:8px;margin-top:13px}
+.tcc-group-assignment-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,.55fr) auto;align-items:center;gap:10px;padding:9px;border:1px solid #e7eeea;border-radius:5px;background:#fbfcfb}
+.tcc-group-assignment-row>strong{font-size:11px}
+.tcc-group-assignment-row .tcc-field{margin:0}
+.tcc-group-assignment-row .button{min-height:34px}
+.tcc-qualification-panel{display:flex;flex-direction:column;gap:11px;margin:12px 0;padding:13px;border:1px solid #d9e3de;border-radius:5px;background:#f8faf8}
+.tcc-qualification-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tcc-qualification-heading h3{margin:4px 0 0;font:600 20px/1 'Barlow Condensed',sans-serif}
+.tcc-qualification-heading>span{padding:5px 8px;border-radius:4px;background:#e7f2e5;color:#386439;font-size:9px;font-weight:700}
+.tcc-group-tables{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}
+.tcc-group-table{min-width:0;padding:10px;border:1px solid #e0e8e2;border-radius:5px;background:#fff}
+.tcc-group-table h4{margin:0 0 8px;font-size:11px}
+.tcc-group-table-scroll,.league-group-table .league-table-wrap{overflow:auto}
+.tcc-group-table table{width:100%;border-collapse:collapse;font-size:9px;text-align:left}
+.tcc-group-table th,.tcc-group-table td{padding:7px 5px;border-bottom:1px solid #edf1ee;white-space:nowrap}
+.tcc-group-table th{color:#5c6b64;font-size:8px}
+.tcc-group-qualified{background:#edf6eb;color:#255d37}
+.tcc-group-qualified td:last-child{font-weight:700}
+.tcc-ended-state{min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center}
+.tcc-ended-state>svg{color:#956b35}
+.tcc-ended-state strong{font:600 23px/1 'Barlow Condensed',sans-serif}
+.tcc-ended-state span{max-width:500px;color:#5c6b64;font-size:11px;line-height:1.6}
+.league-group-tables{display:flex;flex-direction:column;gap:11px;margin-top:24px}
+.league-group-table{padding:13px;border:1px solid #d9e3de;border-radius:6px;background:#fff}
+.league-group-table h3{margin:0 0 9px;font-size:13px}
+.league-row-qualified{background:#edf6eb}
+.league-row-qualified td:last-child{color:#25633b;font-size:10px;font-weight:700}
+.league-hero{position:relative;overflow:hidden}
+.league-hero-banner{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.14;pointer-events:none}
+.league-hero>:not(.league-hero-banner){position:relative;z-index:1}
+.public-detail-team-hero{position:relative;overflow:hidden}
+.public-detail-team-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.15;pointer-events:none}
+.public-detail-team-hero>:not(.public-detail-team-photo){position:relative;z-index:1}
+@media(max-width:700px){.tcc-group-assignment-row{grid-template-columns:minmax(0,1fr) auto}.tcc-group-assignment-row .tcc-field{grid-column:1/-1;grid-row:2}.tcc-group-assignment-row .button{grid-column:2;grid-row:1}.tcc-group-tables{grid-template-columns:1fr}}

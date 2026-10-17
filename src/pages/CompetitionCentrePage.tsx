@@ -3,11 +3,13 @@ import { ArrowLeft, ArrowRight, CalendarDays, CircleDot, Newspaper, Shield, Star
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PublicFrame } from './PublicPages'
 import { supabase } from '../lib/supabase'
+import { publicImageUrl } from '../lib/imageUrl'
 
-type Competition = { id: string; university_id: string; name: string; season: string; type: string; format: string; start_date: string; end_date: string; venue: string | null; description: string; logo_url: string | null; points_for_win: number; points_for_draw: number; points_for_loss: number }
+type Competition = { id: string; university_id: string; name: string; season: string; type: string; format: string; start_date: string; end_date: string; ended_at: string | null; venue: string | null; description: string; logo_url: string | null; banner_url: string | null; points_for_win: number; points_for_draw: number; points_for_loss: number }
 type Team = { id: string; name: string; short_name: string; logo_url: string | null }
 type Match = { id: string; competition_id: string; home_team_id: string; away_team_id: string; kickoff_at: string; status: string; home_score: number; away_score: number; round: string | null; venue: string | null; published_at: string | null }
 type Standing = { position: number; team_id: string; team_name: string; short_name: string; logo_url: string | null; played: number; wins: number; draws: number; losses: number; goals_for: number; goals_against: number; goal_difference: number; points: number }
+type GroupStanding = Standing & { group_name: string; qualified: boolean }
 type PlayerStat = { player_id: string; full_name: string; photo_url: string | null; team_id: string; team_name: string; appearances: number; goals: number; assists: number; clean_sheets: number; yellow_cards: number; red_cards: number }
 type NewsItem = { id: string; title: string; body: string; published_at: string | null; created_at: string; team_id: string | null; match_id: string | null }
 type TabId = 'table' | 'fixtures' | 'players' | 'teams' | 'seasons' | 'news'
@@ -30,6 +32,7 @@ export function CompetitionCentrePage() {
   const [matches, setMatches] = useState<Match[]>([])
   const [teams, setTeams] = useState<Record<string, Team>>({})
   const [standings, setStandings] = useState<Standing[]>([])
+  const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([])
   const [standingsError, setStandingsError] = useState(false)
   const [playerStats, setPlayerStats] = useState<PlayerStat[]>([])
   const [seasons, setSeasons] = useState<Competition[]>([])
@@ -56,7 +59,7 @@ export function CompetitionCentrePage() {
       setLoading(true)
       setError('')
       const { data: comp, error: compError } = await client.from('competitions')
-        .select('id, university_id, name, season, type, format, start_date, end_date, venue, description, logo_url, points_for_win, points_for_draw, points_for_loss')
+        .select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss')
         .eq('id', id)
         .maybeSingle()
       if (!active) return
@@ -67,14 +70,15 @@ export function CompetitionCentrePage() {
       }
       setCompetition(comp as Competition)
 
-      const [universityResult, matchResult, memberResult, standingsResult, statsResult, seasonsResult, newsResult] = await Promise.all([
+      const [universityResult, matchResult, memberResult, standingsResult, statsResult, seasonsResult, newsResult, groupStandingsResult] = await Promise.all([
         client.from('universities').select('name').eq('id', comp.university_id).maybeSingle(),
         client.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, round, venue, published_at').eq('competition_id', id).not('published_at', 'is', null).order('kickoff_at'),
         client.from('competition_teams').select('team_id').eq('competition_id', id),
         client.from('competition_standings').select('position, team_id, team_name, short_name, logo_url, played, wins, draws, losses, goals_for, goals_against, goal_difference, points').eq('competition_id', id).order('position'),
         client.from('competition_player_stats').select('player_id, full_name, photo_url, team_id, team_name, appearances, goals, assists, clean_sheets, yellow_cards, red_cards').eq('competition_id', id),
-        client.from('competitions').select('id, university_id, name, season, type, format, start_date, end_date, venue, description, logo_url, points_for_win, points_for_draw, points_for_loss').eq('university_id', comp.university_id).eq('name', comp.name).order('start_date', { ascending: false }),
+        client.from('competitions').select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss').eq('university_id', comp.university_id).eq('name', comp.name).order('start_date', { ascending: false }),
         client.from('announcements').select('id, title, body, published_at, created_at, team_id, match_id').eq('competition_id', id).eq('is_published', true).order('published_at', { ascending: false }),
+        client.from('competition_group_standings').select('position, competition_id, group_name, team_id, team_name, short_name, logo_url, played, wins, draws, losses, goals_for, goals_against, goal_difference, points, qualified').eq('competition_id', id).order('group_name').order('position'),
       ])
       if (!active) return
       setUniversityName(universityResult.data?.name ?? 'University football')
@@ -82,6 +86,7 @@ export function CompetitionCentrePage() {
       setMatches(matchRows)
       setStandings((standingsResult.data ?? []) as Standing[])
       setStandingsError(Boolean(standingsResult.error))
+      setGroupStandings(groupStandingsResult.error ? [] : groupStandingsResult.data as GroupStanding[])
       setPlayerStats((statsResult.data ?? []) as PlayerStat[])
       setSeasons((seasonsResult.data ?? []) as Competition[])
       setNews((newsResult.data ?? []) as NewsItem[])
@@ -131,9 +136,10 @@ export function CompetitionCentrePage() {
   return <PublicFrame>
     <main className="public-detail-page league-centre">
       <Link to="/competitions" className="public-detail-back"><ArrowLeft size={15} /> Competitions</Link>
-      <header className="league-hero">
-        <span className="league-badge">{competition.logo_url ? <img src={competition.logo_url} alt="" /> : <Trophy size={25} />}</span>
-        <div className="league-hero-copy"><span className="public-overline">{universityName} · {label(competition.type)}</span><h1>{competition.name}</h1><p>{label(competition.format)} · {competition.venue || 'University competition'}</p></div>
+      <header className={`league-hero ${competition.banner_url ? 'league-hero-with-banner' : ''}`}>
+        {competition.banner_url && <img className="league-hero-banner" src={publicImageUrl(competition.banner_url)} alt="" />}
+        <span className="league-badge">{competition.logo_url ? <img src={publicImageUrl(competition.logo_url)} alt="" /> : <Trophy size={25} />}</span>
+        <div className="league-hero-copy"><span className="public-overline">{universityName} · {label(competition.type)}{competition.ended_at ? ' · ENDED' : ''}</span><h1>{competition.name}</h1><p>{label(competition.format)} · {competition.venue || 'University competition'}</p></div>
         <div className="league-hero-actions">
           <label className="league-season-select"><span>Season</span><select value={competition.id} onChange={(event) => navigate(`/competitions/${event.target.value}`)} aria-label="Select historical season">
             {(seasons.length ? seasons : [competition]).map((season) => <option value={season.id} key={season.id}>{season.season}</option>)}
@@ -160,14 +166,26 @@ export function CompetitionCentrePage() {
               const nextTeamId = next ? (next.home_team_id === row.team_id ? next.away_team_id : next.home_team_id) : ''
               return <tr className={index === 0 ? 'league-row-leader' : ''} key={row.team_id}>
                 <td>{row.position ?? index + 1}</td>
-                <td><Link className="league-team-cell" to={`/teams/${row.team_id}`}><span className="league-team-badge">{row.logo_url || teams[row.team_id]?.logo_url ? <img src={row.logo_url || teams[row.team_id]?.logo_url || ''} alt="" /> : <Shield size={16} />}</span><strong>{row.team_name || teams[row.team_id]?.name}</strong></Link></td>
+                <td><Link className="league-team-cell" to={`/teams/${row.team_id}`}><span className="league-team-badge">{row.logo_url || teams[row.team_id]?.logo_url ? <img src={publicImageUrl(row.logo_url || teams[row.team_id]?.logo_url)} alt="" /> : <Shield size={16} />}</span><strong>{row.team_name || teams[row.team_id]?.name}</strong></Link></td>
                 <td>{row.played}</td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td><td>{row.goals_for}</td><td>{row.goals_against}</td><td>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</td><td><strong>{row.points}</strong></td>
                 <td><div className="league-form-dots" aria-label="Recent form">{form.map((value, formIndex) => <span className={`league-form-${value.toLowerCase()}`} key={`${value}-${formIndex}`} title={formTitle(value)}>{value}</span>)}</div></td>
                 <td>{next ? <Link className="league-next-opponent" to={`/matches/${next.id}`} title={`Next: ${teamNames[nextTeamId] ?? 'opponent'}`}>{teams[nextTeamId]?.short_name ?? teams[nextTeamId]?.name ?? '—'}</Link> : <span className="league-muted">—</span>}</td>
               </tr>
             })}</tbody>
           </table></div>}
-          <p className="league-table-note"><span className="league-zone-marker" /> Current table leader. Qualification and relegation zones aren’t configured for this competition.</p>
+          {groupStandings.length > 0 && <section className="league-group-tables">
+            <div className="league-section-heading"><div><span className="public-overline">GROUP STAGE</span><h2>Qualification tables</h2></div><span className="league-team-total">Top 4 advance</span></div>
+            {[...new Set(groupStandings.map((row) => row.group_name))].map((groupName) => <div className="league-group-table" key={groupName}>
+              <h3>Group {groupName}</h3>
+              <div className="league-table-wrap"><table className="league-table"><thead><tr><th>#</th><th>Team</th><th>PL</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>PTS</th><th>Qualification</th></tr></thead><tbody>
+                {groupStandings.filter((row) => row.group_name === groupName).map((row) => <tr className={row.qualified ? 'league-row-qualified' : ''} key={row.team_id}>
+                  <td>{row.position}</td><td><Link className="league-team-cell" to={`/teams/${row.team_id}`}><span className="league-team-badge">{row.logo_url ? <img src={publicImageUrl(row.logo_url)} alt="" /> : <Shield size={16} />}</span><strong>{row.team_name}</strong></Link></td>
+                  <td>{row.played}</td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td><td>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</td><td><strong>{row.points}</strong></td><td>{row.qualified ? 'Qualified' : '—'}</td>
+                </tr>)}
+              </tbody></table></div>
+            </div>)}
+          </section>}
+          <p className="league-table-note"><span className="league-zone-marker" />{groupStandings.length ? 'Green-highlighted teams qualify from their group.' : 'Current table leader.'}</p>
         </section>}
 
         {activeTab === 'fixtures' && <section className="league-content-section">
@@ -239,13 +257,13 @@ function FixtureRow({ match, teams }: { match: Match; teams: Record<string, Team
 }
 
 function TeamBadge({ team }: { team?: Team }) {
-  return <span className="league-team-badge">{team?.logo_url ? <img src={team.logo_url} alt="" /> : <Shield size={15} />}</span>
+  return <span className="league-team-badge">{team?.logo_url ? <img src={publicImageUrl(team.logo_url)} alt="" /> : <Shield size={15} />}</span>
 }
 
 function Leaderboard({ title, rows, value }: { title: string; rows: PlayerStat[]; value: keyof Pick<PlayerStat, 'goals' | 'assists' | 'appearances' | 'clean_sheets' | 'yellow_cards' | 'red_cards'> }) {
   const sorted = rows.filter((row) => row[value] > 0).slice(0, 5)
   return <section className="league-leaderboard"><h3>{title}</h3>{sorted.length ? sorted.map((row, index) => <Link className="league-leader-row" to={`/players/${row.player_id}`} key={row.player_id}>
-    <span className="league-leader-rank">{index + 1}</span><span className="league-player-avatar">{row.photo_url ? <img src={row.photo_url} alt="" /> : <Users size={15} />}</span><span className="league-player-copy"><strong>{row.full_name}</strong><small>{row.team_name}</small></span><b>{row[value]}</b>
+    <span className="league-leader-rank">{index + 1}</span><span className="league-player-avatar">{row.photo_url ? <img src={publicImageUrl(row.photo_url)} alt="" /> : <Users size={15} />}</span><span className="league-player-copy"><strong>{row.full_name}</strong><small>{row.team_name}</small></span><b>{row[value]}</b>
   </Link>) : <p className="league-leader-empty">No recorded stats</p>}</section>
 }
 

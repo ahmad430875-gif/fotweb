@@ -3,8 +3,9 @@ import { ArrowLeft, ArrowRight, CalendarDays, CircleDot, MapPin, Shield, Users }
 import { Link, useParams } from 'react-router-dom'
 import { PublicFrame } from './PublicPages'
 import { supabase } from '../lib/supabase'
+import { publicImageUrl } from '../lib/imageUrl'
 
-type PublicTeam = { id: string; name: string; short_name: string; logo_url: string | null; university_id: string; type?: string; academic_class?: string | null }
+type PublicTeam = { id: string; name: string; short_name: string; logo_url: string | null; team_photo_url?: string | null; university_id: string; type?: string; academic_class?: string | null }
 type PublicPlayer = { id: string; university_id?: string; full_name: string; photo_url: string | null; position: string | null; academic_program?: string | null; current_academic_year?: string | null; injury_status?: string | null; bio?: string | null }
 
 function PublicState({ loading, error, empty }: { loading: boolean; error: string; empty?: boolean }) {
@@ -34,7 +35,7 @@ export function PublicUniversityDetailPage() {
       const [universityResult, competitionResult, teamResult] = await Promise.all([
         client.from('universities').select('id, name, short_name, logo_url, location').eq('id', id).maybeSingle(),
         client.from('competitions').select('id, name, season, type, format, start_date, end_date').eq('university_id', id).eq('status', 'published').order('start_date', { ascending: false }),
-        client.from('teams').select('id, name, short_name, logo_url, university_id, type, academic_class').eq('university_id', id).eq('is_active', true).order('name'),
+        client.from('teams').select('id, name, short_name, logo_url, team_photo_url, university_id, type, academic_class').eq('university_id', id).eq('is_active', true).order('name'),
       ])
       if (!active) return
       if (universityResult.error || !universityResult.data) setError('This university is not available publicly.')
@@ -51,7 +52,7 @@ export function PublicUniversityDetailPage() {
     <main className="public-detail-page">
       <PublicBackLink />
       {university && <header className="public-detail-hero">
-        <span className="public-detail-mark">{university.logo_url ? <img src={university.logo_url} alt="" /> : <Shield size={28} />}</span>
+        <span className="public-detail-mark">{university.logo_url ? <img src={publicImageUrl(university.logo_url)} alt="" /> : <Shield size={28} />}</span>
         <div><span className="public-overline">UNIVERSITY PROFILE · {university.short_name}</span><h1>{university.name}</h1><p><MapPin size={15} />{university.location}</p></div>
       </header>}
       <PublicState loading={loading} error={error} />
@@ -59,7 +60,7 @@ export function PublicUniversityDetailPage() {
         <section className="public-detail-section">
           <div className="public-section-heading"><div><span className="public-overline">REPRESENTING THE CAMPUS</span><h2>Teams</h2></div><span>{teams.length} published teams</span></div>
           {!teams.length ? <PublicState loading={false} error="" empty /> : <div className="public-detail-link-list">{teams.map((team) => <Link className="public-detail-link-row" to={`/teams/${team.id}`} key={team.id}>
-            <span className="public-detail-team-mark">{team.logo_url ? <img src={team.logo_url} alt="" /> : team.short_name.slice(0, 3)}</span><span><strong>{team.name}</strong><small>{team.type === 'class_team' ? team.academic_class || 'Class team' : 'University team'}</small></span><ArrowRight size={16} />
+            <span className="public-detail-team-mark">{team.logo_url ? <img src={publicImageUrl(team.logo_url)} alt="" /> : team.short_name.slice(0, 3)}</span><span><strong>{team.name}</strong><small>{team.type === 'class_team' ? team.academic_class || 'Class team' : 'University team'}</small></span><ArrowRight size={16} />
           </Link>)}</div>}
         </section>
         <section className="public-detail-section">
@@ -88,7 +89,7 @@ export function PublicTeamDetailPage() {
       if (!supabase || !id) { setError('Team details are unavailable.'); setLoading(false); return }
       const client = supabase
       const [teamResult, registrationResult, squadResult, competitionResult] = await Promise.all([
-        client.from('teams').select('id, name, short_name, logo_url, university_id, type, academic_class').eq('id', id).maybeSingle(),
+        client.from('teams').select('id, name, short_name, logo_url, team_photo_url, university_id, type, academic_class').eq('id', id).maybeSingle(),
         client.from('player_registrations').select('player_id, competition_id, shirt_number').eq('team_id', id).is('released_at', null),
         client.from('squad_announcements').select('id, title, description, formation, published_at, competition_id, match_id').eq('team_id', id).eq('is_published', true).order('published_at', { ascending: false }),
         client.from('competition_teams').select('competition_id').eq('team_id', id),
@@ -119,8 +120,9 @@ export function PublicTeamDetailPage() {
   return <PublicFrame>
     <main className="public-detail-page">
       <PublicBackLink to={team ? `/universities/${team.university_id}` : '/universities'} />
-      {team && <header className="public-detail-hero">
-        <span className="public-detail-mark">{team.logo_url ? <img src={team.logo_url} alt="" /> : <Users size={28} />}</span>
+      {team && <header className={`public-detail-hero ${team.team_photo_url ? 'public-detail-team-hero' : ''}`}>
+        {team.team_photo_url && <img className="public-detail-team-photo" src={publicImageUrl(team.team_photo_url)} alt="" />}
+        <span className="public-detail-mark">{team.logo_url ? <img src={publicImageUrl(team.logo_url)} alt="" /> : <Users size={28} />}</span>
         <div><span className="public-overline">{team.type === 'class_team' ? team.academic_class || 'CLASS TEAM' : 'UNIVERSITY TEAM'}</span><h1>{team.name}</h1><Link className="public-detail-inline" to={`/universities/${team.university_id}`}>University profile <ArrowRight size={14} /></Link></div>
       </header>}
       <PublicState loading={loading} error={error} />
@@ -128,7 +130,7 @@ export function PublicTeamDetailPage() {
         <section className="public-detail-section">
           <div className="public-section-heading"><div><span className="public-overline">REGISTERED PLAYERS</span><h2>Squad</h2></div><span>{players.length} players</span></div>
           {!players.length ? <PublicState loading={false} error="" empty /> : <div className="public-player-grid">{players.map((player) => <Link className="public-player-row" to={`/players/${player.id}`} key={player.id}>
-            <span className="public-player-photo">{player.photo_url ? <img src={player.photo_url} alt="" /> : <Users size={18} />}</span><span><strong>{player.full_name}</strong><small>{player.position || 'Player'}{player.academic_program ? ` · ${player.academic_program}` : ''}</small></span><b>{player.shirt_number ?? '—'}</b>
+            <span className="public-player-photo">{player.photo_url ? <img src={publicImageUrl(player.photo_url)} alt="" /> : <Users size={18} />}</span><span><strong>{player.full_name}</strong><small>{player.position || 'Player'}{player.academic_program ? ` · ${player.academic_program}` : ''}</small></span><b>{player.shirt_number ?? '—'}</b>
           </Link>)}</div>}
         </section>
         <section className="public-detail-section">
@@ -172,7 +174,7 @@ export function PublicPlayerDetailPage() {
     <main className="public-detail-page">
       <PublicBackLink />
       {player && <header className="public-detail-hero">
-        <span className="public-detail-mark public-player-detail-photo">{player.photo_url ? <img src={player.photo_url} alt="" /> : <Users size={28} />}</span>
+        <span className="public-detail-mark public-player-detail-photo">{player.photo_url ? <img src={publicImageUrl(player.photo_url)} alt="" /> : <Users size={28} />}</span>
         <div><span className="public-overline">PLAYER PROFILE</span><h1>{player.full_name}</h1><p>{[player.position, player.academic_program, player.current_academic_year].filter(Boolean).join(' · ')}</p><Link className="public-detail-inline" to={`/universities/${player.university_id}`}>University profile <ArrowRight size={14} /></Link></div>
       </header>}
       <PublicState loading={loading} error={error} />
@@ -229,7 +231,7 @@ export function PublicSquadDetailPage() {
       {!loading && !error && <div className="public-squad-columns">{(['starting_xi', 'substitute'] as const).map((role) => <section className="public-detail-section" key={role}>
         <div className="public-section-heading"><div><span className="public-overline">MATCHDAY</span><h2>{role === 'starting_xi' ? 'Starting XI' : 'Substitutes'}</h2></div><span>{players.filter((entry) => entry.role === role).length}</span></div>
         <div className="public-player-grid">{players.filter((entry) => entry.role === role).map((entry) => <Link className="public-player-row" to={`/players/${entry.player.id}`} key={entry.player.id}>
-          <span className="public-player-photo">{entry.player.photo_url ? <img src={entry.player.photo_url} alt="" /> : <Users size={18} />}</span><span><strong>{entry.player.full_name}</strong><small>{entry.position || entry.player.position || 'Player'}{entry.is_captain ? ' · Captain' : entry.is_vice_captain ? ' · Vice-captain' : entry.is_goalkeeper ? ' · Goalkeeper' : ''}</small></span><b>{entry.shirt_number ?? '—'}</b>
+          <span className="public-player-photo">{entry.player.photo_url ? <img src={publicImageUrl(entry.player.photo_url)} alt="" /> : <Users size={18} />}</span><span><strong>{entry.player.full_name}</strong><small>{entry.position || entry.player.position || 'Player'}{entry.is_captain ? ' · Captain' : entry.is_vice_captain ? ' · Vice-captain' : entry.is_goalkeeper ? ' · Goalkeeper' : ''}</small></span><b>{entry.shirt_number ?? '—'}</b>
         </Link>)}</div>
       </section>)}</div>}
     </main>

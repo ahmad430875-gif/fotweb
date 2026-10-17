@@ -9,7 +9,7 @@ const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-type Action = 'list' | 'invite' | 'reset' | 'enable' | 'disable'
+type Action = 'list' | 'invite' | 'replace' | 'reset' | 'enable' | 'disable'
 type RequestBody = { action?: Action; universityId?: string; userId?: string; email?: string }
 
 function respond(status: number, body: Record<string, unknown>) {
@@ -84,27 +84,38 @@ Deno.serve(async (request) => {
       .order('is_active', { ascending: false })
       .order('created_at')
     if (error) return respond(500, { error: 'Secretary accounts could not be loaded.' })
-    const secretaries = await Promise.all((profiles ?? []).map(async (profile) => {
-      const { data } = await service.auth.admin.getUserById(profile.id)
-      return { ...profile, email: data.user?.email ?? '' }
+    const accountResults = await Promise.all((profiles ?? []).map(async (profile) => {
+      const { data, error: userError } = await service.auth.admin.getUserById(profile.id)
+      return userError
+        ? { error: userError, secretary: null }
+        : { error: null, secretary: { ...profile, email: data.user?.email ?? '' } }
     }))
+    const accountFailure = accountResults.find((result) => result.error)
+    if (accountFailure?.error) return respond(500, { error: `Secretary email could not be loaded: ${accountFailure.error.message}` })
+    const secretaries = accountResults.flatMap((result) => result.secretary ? [result.secretary] : [])
     return respond(200, { secretaries })
   }
 
-  if (body.action === 'invite') {
+  if (body.action === 'invite' || body.action === 'replace') {
     const email = body.email?.trim().toLowerCase()
     if (!email || email.length > 254 || !emailPattern.test(email)) return respond(400, { error: 'Enter a valid Secretary email address.' })
     if (!university.is_active) return respond(409, { error: 'Activate this university before inviting a Secretary.' })
 
-    const { data: existing, error: existingError } = await service
+    const { data: activeSecretaries, error: existingError } = await service
       .from('user_profiles')
       .select('id, is_active')
       .eq('university_id', university.id)
       .eq('role', 'university_admin')
       .eq('is_active', true)
-      .maybeSingle()
+    const existing = activeSecretaries?.[0]
     if (existingError) return respond(500, { error: 'The existing Secretary account could not be checked.' })
-    if (existing) return respond(409, { error: 'This university already has an active Sports Secretary.' })
+    if (body.action === 'invite' && existing) return respond(409, { error: 'This university already has an active Sports Secretary. Use the change Secretary action instead.' })
+    if (body.action === 'replace') {
+      if (!existing || existing.id !== body.userId) return respond(409, { error: 'The active Secretary has changed. Reload the university record and try again.' })
+      const { data: existingUser, error: existingUserError } = await service.auth.admin.getUserById(existing.id)
+      if (existingUserError) return respond(500, { error: 'The current Secretary account could not be checked.' })
+      if (existingUser.user?.email?.toLowerCase() === email) return respond(400, { error: 'Enter an email address different from the current Secretary.' })
+    }
 
     const appUrl = getAppRedirectUrl(request)
     if (!appUrl) return respond(500, { error: 'The invitation redirect URL is not configured.' })
@@ -120,6 +131,14 @@ Deno.serve(async (request) => {
     }
     if (!invitation.user) return respond(500, { error: 'The invitation email was accepted, but no account was created. Check the Supabase Auth logs before retrying.' })
 
+    if (body.action === 'replace') {
+      const { error: disableError } = await service.from('user_profiles').update({ is_active: false }).eq('id', existing!.id)
+      if (disableError) {
+        await service.auth.admin.deleteUser(invitation.user.id)
+        return respond(500, { error: 'The current Secretary could not be disabled, so the replacement was not completed.' })
+      }
+    }
+
     const { error: profileError } = await service.from('user_profiles').insert({
       id: invitation.user.id,
       university_id: university.id,
@@ -129,11 +148,22 @@ Deno.serve(async (request) => {
     })
     if (profileError) {
       await service.auth.admin.deleteUser(invitation.user.id)
+      if (body.action === 'replace') {
+        await service.from('user_profiles').update({ is_active: true }).eq('id', existing!.id)
+      }
       return respond(500, { error: 'The invitation could not be linked to this university. Please try again.' })
     }
 
+    const { error: banError } = body.action === 'replace'
+      ? await service.auth.admin.updateUserById(existing!.id, { ban_duration: '876000h' })
+      : { error: null }
     await recordAudit(service, caller.id, university.id, 'secretary_invited', invitation.user.id)
-    return respond(200, { message: `Invitation sent to ${email}.`, secretaryId: invitation.user.id })
+    return respond(200, {
+      message: body.action === 'replace'
+        ? `Replacement invitation sent to ${email}. The previous Secretary profile has been disabled.${banError ? ` Auth session blocking needs attention: ${banError.message}` : ''}`
+        : `Invitation sent to ${email}.`,
+      secretaryId: invitation.user.id,
+    })
   }
 
   if (!body.userId || !uuidPattern.test(body.userId)) return respond(400, { error: 'A valid Secretary account ID is required.' })

@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowRight, CalendarDays, CircleDot, Goal, MapPin, Shie
 import { Link } from 'react-router-dom'
 import { FootballLogo } from '../components/FootballLogo'
 import { supabase, supabaseConfigured } from '../lib/supabase'
+import { publicImageUrl } from '../lib/imageUrl'
 
 type PublicCompetition = {
   id: string
@@ -370,11 +371,11 @@ function MatchRow({ match, teams, competitions }: { match: PublicMatch; teams: P
       </div>
       <div className="public-match-teams">
         <div>
-          <span className="public-team-crest">{home?.logo_url ? <img src={home.logo_url} alt="" /> : (home?.short_name ?? 'TBC').slice(0, 3)}</span>
+          <span className="public-team-crest">{home?.logo_url ? <img src={publicImageUrl(home.logo_url)} alt="" /> : (home?.short_name ?? 'TBC').slice(0, 3)}</span>
           <strong>{home?.name ?? 'Team to be announced'}</strong>
         </div>
         <div>
-          <span className="public-team-crest">{away?.logo_url ? <img src={away.logo_url} alt="" /> : (away?.short_name ?? 'TBC').slice(0, 3)}</span>
+          <span className="public-team-crest">{away?.logo_url ? <img src={publicImageUrl(away.logo_url)} alt="" /> : (away?.short_name ?? 'TBC').slice(0, 3)}</span>
           <strong>{away?.name ?? 'Team to be announced'}</strong>
         </div>
       </div>
@@ -389,7 +390,7 @@ function MatchRow({ match, teams, competitions }: { match: PublicMatch; teams: P
 function UniversityMark({ university, large = false }: { university?: PublicUniversity; large?: boolean }) {
   return (
     <span className={`public-university-mark ${large ? 'public-university-mark-large' : ''}`}>
-      {university?.logo_url ? <img src={university.logo_url} alt="" /> : <Goal size={large ? 23 : 16} />}
+      {university?.logo_url ? <img src={publicImageUrl(university.logo_url)} alt="" /> : <Goal size={large ? 23 : 16} />}
     </span>
   )
 }
