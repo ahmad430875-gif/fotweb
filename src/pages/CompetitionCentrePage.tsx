@@ -5,7 +5,7 @@ import { PublicFrame } from './PublicPages'
 import { supabase } from '../lib/supabase'
 import { publicImageUrl } from '../lib/imageUrl'
 
-type Competition = { id: string; university_id: string; name: string; season: string; type: string; format: string; start_date: string; end_date: string; ended_at: string | null; venue: string | null; description: string; logo_url: string | null; banner_url: string | null; points_for_win: number; points_for_draw: number; points_for_loss: number }
+type Competition = { id: string; university_id: string; name: string; season: string; type: string; format: string; start_date: string; end_date: string; ended_at: string | null; venue: string | null; description: string; logo_url: string | null; banner_url: string | null; points_for_win: number; points_for_draw: number; points_for_loss: number; qualifiers_per_group: number }
 type Team = { id: string; name: string; short_name: string; logo_url: string | null }
 type Match = { id: string; competition_id: string; home_team_id: string; away_team_id: string; kickoff_at: string; status: string; home_score: number; away_score: number; round: string | null; venue: string | null; published_at: string | null }
 type Standing = { position: number; team_id: string; team_name: string; short_name: string; logo_url: string | null; played: number; wins: number; draws: number; losses: number; goals_for: number; goals_against: number; goal_difference: number; points: number }
@@ -59,7 +59,7 @@ export function CompetitionCentrePage() {
       setLoading(true)
       setError('')
       const { data: comp, error: compError } = await client.from('competitions')
-        .select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss')
+        .select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss, qualifiers_per_group')
         .eq('id', id)
         .maybeSingle()
       if (!active) return
@@ -76,7 +76,7 @@ export function CompetitionCentrePage() {
         client.from('competition_teams').select('team_id').eq('competition_id', id),
         client.from('competition_standings').select('position, team_id, team_name, short_name, logo_url, played, wins, draws, losses, goals_for, goals_against, goal_difference, points').eq('competition_id', id).order('position'),
         client.from('competition_player_stats').select('player_id, full_name, photo_url, team_id, team_name, appearances, goals, assists, clean_sheets, yellow_cards, red_cards').eq('competition_id', id),
-        client.from('competitions').select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss').eq('university_id', comp.university_id).eq('name', comp.name).order('start_date', { ascending: false }),
+        client.from('competitions').select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss, qualifiers_per_group').eq('university_id', comp.university_id).eq('name', comp.name).order('start_date', { ascending: false }),
         client.from('announcements').select('id, title, body, published_at, created_at, team_id, match_id').eq('competition_id', id).eq('is_published', true).order('published_at', { ascending: false }),
         client.from('competition_group_standings').select('position, competition_id, group_name, team_id, team_name, short_name, logo_url, played, wins, draws, losses, goals_for, goals_against, goal_difference, points, qualified').eq('competition_id', id).order('group_name').order('position'),
       ])
@@ -174,7 +174,7 @@ export function CompetitionCentrePage() {
             })}</tbody>
           </table></div>}
           {groupStandings.length > 0 && <section className="league-group-tables">
-            <div className="league-section-heading"><div><span className="public-overline">GROUP STAGE</span><h2>Qualification tables</h2></div><span className="league-team-total">Top 4 advance</span></div>
+            <div className="league-section-heading"><div><span className="public-overline">GROUP STAGE</span><h2>Qualification tables</h2></div><span className="league-team-total">Top {competition.qualifiers_per_group} advance</span></div>
             {[...new Set(groupStandings.map((row) => row.group_name))].map((groupName) => <div className="league-group-table" key={groupName}>
               <h3>Group {groupName}</h3>
               <div className="league-table-wrap"><table className="league-table"><thead><tr><th>#</th><th>Team</th><th>PL</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>PTS</th><th>Qualification</th></tr></thead><tbody>

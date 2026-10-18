@@ -8,7 +8,7 @@ import { InstitutionalEligibilityCheck } from './InstitutionalEligibilityCheck'
 import { TournamentBracketView, type BracketFixture, type BracketRound } from './TournamentBracketView'
 import './SecretaryControlCenter.css'
 
-type Competition = { id: string; name: string; season: string; ended_at: string | null }
+type Competition = { id: string; name: string; season: string; ended_at: string | null; qualifiers_per_group: number }
 type Team = { id: string; name: string; group_name: string | null }
 type GroupStanding = {
   position: number
@@ -59,6 +59,7 @@ export function SecretaryControlCenter() {
   const universityId = scope?.universityId ?? profile?.university_id
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [competitionId, setCompetitionId] = useState('')
+  const [qualifiersPerGroupDraft, setQualifiersPerGroupDraft] = useState(4)
   const [teams, setTeams] = useState<Team[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [stages, setStages] = useState<Stage[]>([])
@@ -109,7 +110,7 @@ export function SecretaryControlCenter() {
       setLoading(true)
       const { data, error: loadError } = await supabase
         .from('competitions')
-        .select('id, name, season, ended_at')
+        .select('id, name, season, ended_at, qualifiers_per_group')
         .eq('university_id', universityId)
         .order('start_date', { ascending: false })
       if (!active) return
@@ -127,6 +128,10 @@ export function SecretaryControlCenter() {
     void loadCompetitions()
     return () => { active = false }
   }, [universityId])
+
+  useEffect(() => {
+    setQualifiersPerGroupDraft(competitions.find((row) => row.id === competitionId)?.qualifiers_per_group ?? 4)
+  }, [competitionId, competitions])
 
   useEffect(() => {
     let active = true
@@ -277,6 +282,19 @@ export function SecretaryControlCenter() {
     }, 'Team group saved.')
   }
 
+  async function saveQualifiersPerGroup() {
+    if (!supabase || !competitionId || !competition) return
+    const client = supabase
+    const saved = await runAction(async () => await client.from('competitions')
+      .update({ qualifiers_per_group: qualifiersPerGroupDraft })
+      .eq('id', competitionId), `Top ${qualifiersPerGroupDraft} teams per group will qualify.`)
+    if (saved) {
+      setCompetitions((current) => current.map((row) => row.id === competitionId
+        ? { ...row, qualifiers_per_group: qualifiersPerGroupDraft }
+        : row))
+    }
+  }
+
   async function seedGroupQualifiers() {
     if (!supabase || !competitionId || !selectedStageId) return
     const client = supabase
@@ -293,7 +311,11 @@ export function SecretaryControlCenter() {
       return
     }
     setSelectedStageId(knockoutStageId)
-    setNotice('Top four teams from each group have been seeded into the knockout bracket.')
+    const qualifierCount = competition?.qualifiers_per_group ?? 4
+    const singleGroupBye = Object.keys(groupTables).length === 1 && qualifierCount % 2 === 1
+    setNotice(singleGroupBye
+      ? `Top ${qualifierCount} teams have qualified. The first-place team has a bye; schedule the final after the preliminary match.`
+      : `Top ${qualifierCount} teams from each group have been seeded into the knockout bracket.`)
     setRefreshKey((key) => key + 1)
   }
 
@@ -456,7 +478,7 @@ export function SecretaryControlCenter() {
         </section>
         <section className="tcc-panel tcc-group-assignment">
           <div className="tcc-panel-title"><div><span className="eyebrow">GROUP STAGE</span><h2>Assign teams to groups</h2></div><Users size={18} /></div>
-          <p className="tcc-step-help">Give every participating team a group name (for example, A or B). Completed group fixtures will build each table and mark its top four as qualified.</p>
+          <p className="tcc-step-help">Give every participating team a group name (for example, A or B). Completed group fixtures will build each table and mark its top {competition?.qualifiers_per_group ?? 4} as qualified.</p>
           {teams.length ? <div className="tcc-group-assignment-list">
             {teams.map((team) => <div className="tcc-group-assignment-row" key={team.id}>
               <strong>{team.name}</strong>
@@ -490,7 +512,13 @@ export function SecretaryControlCenter() {
           <label className="tcc-field tcc-stage-filter">Stage<select value={selectedStageId} onChange={(event) => setStage(event.target.value)}><option value="">Select stage</option>{stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
           {selectedStage?.stage_type === 'group' && (
             <section className="tcc-qualification-panel">
-              <div className="tcc-qualification-heading"><div><span className="eyebrow">QUALIFICATION</span><h3>Group tables</h3></div><span>Top 4 advance</span></div>
+              <div className="tcc-qualification-heading"><div><span className="eyebrow">QUALIFICATION</span><h3>Group tables</h3></div><span>Top {competition?.qualifiers_per_group ?? 4} advance</span></div>
+              <div className="tcc-qualifier-control">
+                <label className="tcc-field">Teams advancing from each group<select value={qualifiersPerGroupDraft} onChange={(event) => setQualifiersPerGroupDraft(Number(event.target.value))} disabled={busy || Boolean(competition?.ended_at)}>
+                  {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count}</option>)}
+                </select></label>
+                <button className="button button-secondary" type="button" disabled={busy || Boolean(competition?.ended_at) || qualifiersPerGroupDraft === competition?.qualifiers_per_group} onClick={() => void saveQualifiersPerGroup()}>Save qualification</button>
+              </div>
               {Object.keys(groupTables).length ? <div className="tcc-group-tables">{Object.entries(groupTables).map(([groupName, rows]) => (
                 <div className="tcc-group-table" key={groupName}>
                   <h4>Group {groupName}</h4>
@@ -502,7 +530,7 @@ export function SecretaryControlCenter() {
                 </div>
               ))}</div> : <p className="tcc-step-help">Assign teams to groups, then record completed group-stage results to populate the tables.</p>}
               <p className="tcc-step-help">When every group fixture is complete, seed qualified teams into the first knockout round. A single group creates semi-finals; paired groups are cross-seeded by position.</p>
-              <button className="button button-primary" type="button" disabled={busy || Boolean(competition?.ended_at) || !Object.keys(groupTables).length} onClick={() => void seedGroupQualifiers()}><Flag size={15} />Qualify top four &amp; seed bracket</button>
+              <button className="button button-primary" type="button" disabled={busy || Boolean(competition?.ended_at) || !Object.keys(groupTables).length} onClick={() => void seedGroupQualifiers()}><Flag size={15} />Qualify top {competition?.qualifiers_per_group ?? 4} &amp; seed bracket</button>
             </section>
           )}
           <TournamentBracketView rounds={bracketRounds} teamNames={teamNames} fixtureNames={matchNames} onSelectFixture={setSelectedMatchId} />

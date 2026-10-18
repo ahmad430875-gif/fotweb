@@ -283,8 +283,9 @@
 .public-detail-back{width:max-content;display:flex;align-items:center;gap:7px;margin-bottom:20px;color:#52675c;font-size:13px;font-weight:600}
 .public-detail-back:hover,.public-detail-inline:hover{color:#2e7d5d}
 .public-detail-hero{display:flex;align-items:center;gap:18px;padding:22px 0 25px;border-bottom:1px solid #d9e3de}
-.public-detail-mark{width:76px;height:76px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:1px solid #d9e3de;border-radius:8px;background:#fff;color:#2e7d5d}
-.public-detail-mark img,.public-detail-team-mark img,.public-player-photo img,.public-score-team img{width:100%;height:100%;object-fit:cover}
+.public-detail-mark{width:76px;height:76px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:0;border-radius:8px;background:transparent;color:#2e7d5d}
+.public-detail-mark img,.public-detail-team-mark img{width:100%;height:100%;object-fit:contain}
+.public-player-photo img,.public-score-team img{width:100%;height:100%;object-fit:cover}
 .public-detail-hero h1,.public-detail-heading h1{margin:5px 0 7px;font:700 34px/1.12 'DM Sans',sans-serif}
 .public-detail-hero p{display:flex;align-items:center;gap:6px;margin:0;color:#5c6b64;font-size:13px}
 .public-detail-section{padding:25px 0;border-bottom:1px solid #d9e3de}
@@ -296,7 +297,10 @@
 .public-detail-link-row strong,.public-player-row strong{overflow:hidden;color:#1e2925;font-size:14px;text-overflow:ellipsis;white-space:nowrap}
 .public-detail-link-row small,.public-player-row small{overflow:hidden;color:#5c6b64;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
 .public-detail-link-row>svg{color:#2e7d5d}
-.public-detail-team-mark,.public-player-photo{width:42px;height:42px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:1px solid #d9e3de;border-radius:5px;background:#f3f7f5;color:#2e7d5d;font-size:11px;font-weight:700}
+.public-detail-team-mark,.public-player-photo{width:42px;height:42px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:0;border-radius:50%;background:#f3f7f5;color:#2e7d5d;font-size:11px;font-weight:700}
+.public-detail-team-mark{background:transparent}
+.public-player-detail-photo{border-radius:50%}
+.public-player-detail-photo img{object-fit:cover}
 .public-player-row>b{min-width:28px;color:#1e2925;font:700 18px 'Barlow Condensed',sans-serif;text-align:right}
 .public-detail-inline{display:inline-flex;align-items:center;gap:5px;color:#2e7d5d;font-size:12px;font-weight:600}
 .public-player-bio,.public-player-availability{padding:15px 0;border-bottom:1px solid #d9e3de;color:#43594f;font-size:14px;line-height:1.7}
@@ -575,8 +579,10 @@
 
 .league-centre{max-width:1180px}
 .league-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:17px;padding:19px 0 23px;border-bottom:1px solid #d9e3de}
-.league-badge{width:62px;height:62px;display:grid;place-items:center;overflow:hidden;border:1px solid #d9e3de;border-radius:8px;background:#fff;color:#2e7d5d}
-.league-badge img{width:100%;height:100%;object-fit:cover}
+.league-badge{width:62px;height:62px;display:grid;place-items:center;overflow:hidden;border:0;border-radius:8px;background:transparent;color:#2e7d5d}
+.league-badge img{width:100%;height:100%;object-fit:contain}
+.tcc-qualifier-control{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:10px 0}
+.tcc-qualifier-control>.tcc-field{width:min(100%,280px)}
 .league-hero-copy{min-width:0}
 .league-hero-copy h1{margin:4px 0 5px;color:#1e2925;font:700 30px/1.12 'DM Sans',sans-serif;overflow-wrap:anywhere}
 .league-hero-copy p{margin:0;color:#627269;font-size:12px}
@@ -609,8 +615,8 @@
 .league-row-leader td:first-child{box-shadow:inset 3px 0 #2e7d5d;color:#1f6048;font-weight:700}
 .league-team-cell{display:flex;align-items:center;gap:8px;color:#263c30}
 .league-team-cell>strong{overflow:hidden;text-overflow:ellipsis}
-.league-team-badge{width:24px;height:24px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:1px solid #e0e8e2;border-radius:50%;background:#f6f8f6;color:#5d7866}
-.league-team-badge img{width:100%;height:100%;object-fit:cover}
+.league-team-badge{width:24px;height:24px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:0;border-radius:50%;background:transparent;color:#5d7866}
+.league-team-badge img{width:100%;height:100%;object-fit:contain}
 .league-form-dots{display:flex;justify-content:flex-end;gap:3px}
 .league-form-dots>span{width:18px;height:18px;display:grid;place-items:center;border-radius:50%;color:#fff;font-size:8px;font-weight:700}
 .league-form-w{background:#32815b}.league-form-d{background:#9b8b4d}.league-form-l{background:#be5c51}
