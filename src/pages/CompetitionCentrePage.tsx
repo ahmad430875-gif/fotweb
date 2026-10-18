@@ -4,20 +4,22 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PublicFrame } from './PublicPages'
 import { supabase } from '../lib/supabase'
 import { publicImageUrl } from '../lib/imageUrl'
+import { PublicKnockoutBracket, type PublicBracketFixture, type PublicBracketStage } from './PublicKnockoutBracket'
 
-type Competition = { id: string; university_id: string; name: string; season: string; type: string; format: string; start_date: string; end_date: string; ended_at: string | null; venue: string | null; description: string; logo_url: string | null; banner_url: string | null; points_for_win: number; points_for_draw: number; points_for_loss: number; qualifiers_per_group: number }
+type Competition = { id: string; university_id: string; name: string; season: string; type: string; format: string; start_date: string; end_date: string; ended_at: string | null; venue: string | null; description: string; logo_url: string | null; banner_url: string | null; points_for_win: number; points_for_draw: number; points_for_loss: number; qualifiers_per_group: number; knockout_published: boolean }
 type Team = { id: string; name: string; short_name: string; logo_url: string | null }
 type Match = { id: string; competition_id: string; home_team_id: string; away_team_id: string; kickoff_at: string; status: string; home_score: number; away_score: number; round: string | null; venue: string | null; published_at: string | null }
 type Standing = { position: number; team_id: string; team_name: string; short_name: string; logo_url: string | null; played: number; wins: number; draws: number; losses: number; goals_for: number; goals_against: number; goal_difference: number; points: number }
 type GroupStanding = Standing & { group_name: string; qualified: boolean }
 type PlayerStat = { player_id: string; full_name: string; photo_url: string | null; team_id: string; team_name: string; appearances: number; goals: number; assists: number; clean_sheets: number; yellow_cards: number; red_cards: number }
 type NewsItem = { id: string; title: string; body: string; published_at: string | null; created_at: string; team_id: string | null; match_id: string | null }
-type TabId = 'table' | 'fixtures' | 'players' | 'teams' | 'seasons' | 'news'
+type TabId = 'table' | 'fixtures' | 'knockout' | 'players' | 'teams' | 'seasons' | 'news'
 type TableMode = 'all' | 'home' | 'away' | 'xg'
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'table', label: 'Table' },
   { id: 'fixtures', label: 'Fixtures' },
+  { id: 'knockout', label: 'Knockout' },
   { id: 'players', label: 'Player stats' },
   { id: 'teams', label: 'Team stats' },
   { id: 'seasons', label: 'Seasons' },
@@ -33,6 +35,8 @@ export function CompetitionCentrePage() {
   const [teams, setTeams] = useState<Record<string, Team>>({})
   const [standings, setStandings] = useState<Standing[]>([])
   const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([])
+  const [knockoutStages, setKnockoutStages] = useState<PublicBracketStage[]>([])
+  const [knockoutError, setKnockoutError] = useState(false)
   const [standingsError, setStandingsError] = useState(false)
   const [playerStats, setPlayerStats] = useState<PlayerStat[]>([])
   const [seasons, setSeasons] = useState<Competition[]>([])
@@ -59,7 +63,7 @@ export function CompetitionCentrePage() {
       setLoading(true)
       setError('')
       const { data: comp, error: compError } = await client.from('competitions')
-        .select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss, qualifiers_per_group')
+        .select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss, qualifiers_per_group, knockout_published')
         .eq('id', id)
         .maybeSingle()
       if (!active) return
@@ -70,15 +74,19 @@ export function CompetitionCentrePage() {
       }
       setCompetition(comp as Competition)
 
-      const [universityResult, matchResult, memberResult, standingsResult, statsResult, seasonsResult, newsResult, groupStandingsResult] = await Promise.all([
+      const knockoutStageRequest = comp.knockout_published
+        ? client.from('tournament_stages').select('id, name, sequence_order').eq('competition_id', id).eq('stage_type', 'knockout').order('sequence_order')
+        : Promise.resolve({ data: [], error: null })
+      const [universityResult, matchResult, memberResult, standingsResult, statsResult, seasonsResult, newsResult, groupStandingsResult, knockoutStageResult] = await Promise.all([
         client.from('universities').select('name').eq('id', comp.university_id).maybeSingle(),
         client.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, round, venue, published_at').eq('competition_id', id).not('published_at', 'is', null).order('kickoff_at'),
         client.from('competition_teams').select('team_id').eq('competition_id', id),
         client.from('competition_standings').select('position, team_id, team_name, short_name, logo_url, played, wins, draws, losses, goals_for, goals_against, goal_difference, points').eq('competition_id', id).order('position'),
         client.from('competition_player_stats').select('player_id, full_name, photo_url, team_id, team_name, appearances, goals, assists, clean_sheets, yellow_cards, red_cards').eq('competition_id', id),
-        client.from('competitions').select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss, qualifiers_per_group').eq('university_id', comp.university_id).eq('name', comp.name).order('start_date', { ascending: false }),
+        client.from('competitions').select('id, university_id, name, season, type, format, start_date, end_date, ended_at, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss, qualifiers_per_group, knockout_published').eq('university_id', comp.university_id).eq('name', comp.name).order('start_date', { ascending: false }),
         client.from('announcements').select('id, title, body, published_at, created_at, team_id, match_id').eq('competition_id', id).eq('is_published', true).order('published_at', { ascending: false }),
         client.from('competition_group_standings').select('position, competition_id, group_name, team_id, team_name, short_name, logo_url, played, wins, draws, losses, goals_for, goals_against, goal_difference, points, qualified').eq('competition_id', id).order('group_name').order('position'),
+        knockoutStageRequest,
       ])
       if (!active) return
       setUniversityName(universityResult.data?.name ?? 'University football')
@@ -92,9 +100,39 @@ export function CompetitionCentrePage() {
       setNews((newsResult.data ?? []) as NewsItem[])
       setNewsError(Boolean(newsResult.error))
 
+      const stageRows = (knockoutStageResult.data ?? []) as Array<{ id: string; name: string; sequence_order: number }>
+      const stageIds = stageRows.map((stage) => stage.id)
+      let rounds: Array<{ id: string; name: string; round_number: number; stage_id: string }> = []
+      let bracketFixtures: PublicBracketFixture[] = []
+      let bracketError = Boolean(knockoutStageResult.error)
+      if (stageIds.length) {
+        const roundResult = await client.from('tournament_rounds').select('id, name, round_number, stage_id').in('stage_id', stageIds).order('round_number')
+        if (!active) return
+        if (roundResult.error) bracketError = true
+        else {
+          rounds = (roundResult.data ?? []) as typeof rounds
+          const roundIds = rounds.map((round) => round.id)
+          if (roundIds.length) {
+            const fixtureResult = await client.from('match_brackets').select('id, match_id, round_id, home_team_id, away_team_id, home_score, away_score, match_status, winner_team_id, match_date').in('round_id', roundIds).order('match_date')
+            if (!active) return
+            if (fixtureResult.error) bracketError = true
+            else bracketFixtures = (fixtureResult.data ?? []) as PublicBracketFixture[]
+          }
+        }
+      }
+      setKnockoutStages(stageRows.map((stage) => ({
+        ...stage,
+        rounds: rounds.filter((round) => round.stage_id === stage.id).map((round) => ({
+          ...round,
+          fixtures: bracketFixtures.filter((fixture) => fixture.round_id === round.id),
+        })),
+      })))
+      setKnockoutError(bracketError)
+
       const teamIds = [...new Set([
         ...(memberResult.data ?? []).map((row) => row.team_id),
         ...matchRows.flatMap((row) => [row.home_team_id, row.away_team_id]),
+        ...bracketFixtures.flatMap((fixture) => [fixture.home_team_id, fixture.away_team_id]),
       ])]
       if (teamIds.length) {
         const { data: teamRows } = await client.from('teams').select('id, name, short_name, logo_url').in('id', teamIds)
@@ -124,6 +162,10 @@ export function CompetitionCentrePage() {
   const groupedFixtures = useMemo(() => groupFixtures(matches), [matches])
   const sortedPlayerStats = useMemo(() => [...playerStats].sort((a, b) => b.goals - a.goals || b.assists - a.assists), [playerStats])
 
+  useEffect(() => {
+    if (competition?.knockout_published) setActiveTab('knockout')
+  }, [competition?.id, competition?.knockout_published])
+
   function toggleFollow() {
     const next = !followed
     setFollowed(next)
@@ -132,6 +174,8 @@ export function CompetitionCentrePage() {
 
   if (loading) return <PublicFrame><main className="public-detail-page"><div className="public-loading">Loading competition centre…</div></main></PublicFrame>
   if (error || !competition) return <PublicFrame><main className="public-detail-page"><div className="public-empty"><CircleDot size={19} /><strong>Competition unavailable</strong><span>{error || 'This competition is not publicly available.'}</span><Link className="public-detail-inline" to="/competitions">Browse competitions <ArrowRight size={14} /></Link></div></main></PublicFrame>
+
+  const visibleTabs = tabs.filter((tab) => tab.id !== 'knockout' || competition.knockout_published)
 
   return <PublicFrame>
     <main className="public-detail-page league-centre">
@@ -149,12 +193,12 @@ export function CompetitionCentrePage() {
       </header>
 
       <nav className="league-tabs" role="tablist" aria-label="Competition sections">
-        {tabs.map((tab) => <button type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`league-panel-${tab.id}`} id={`league-tab-${tab.id}`} className={`league-tab ${activeTab === tab.id ? 'league-tab-active' : ''}`} key={tab.id} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}
+        {visibleTabs.map((tab) => <button type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`league-panel-${tab.id}`} id={`league-tab-${tab.id}`} className={`league-tab ${activeTab === tab.id ? 'league-tab-active' : ''}`} key={tab.id} onClick={() => setActiveTab(tab.id)}>{tab.id === 'table' && competition.knockout_published ? 'Group table' : tab.label}</button>)}
       </nav>
 
       <div className="league-tab-panel" role="tabpanel" id={`league-panel-${activeTab}`} aria-labelledby={`league-tab-${activeTab}`}>
         {activeTab === 'table' && <section className="league-content-section">
-          <div className="league-section-heading"><div><span className="public-overline">{competition.season} SEASON</span><h2>League table</h2></div><span className="league-team-total">{fullStandings.length} teams</span></div>
+          <div className="league-section-heading"><div><span className="public-overline">{competition.season} SEASON</span><h2>{competition.knockout_published ? 'Group stage · final table' : 'League table'}</h2></div><span className="league-team-total">{fullStandings.length} teams</span></div>
           <div className="league-filters" role="group" aria-label="Table split">
             {([{ id: 'all', label: 'All' }, { id: 'home', label: 'Home' }, { id: 'away', label: 'Away' }, { id: 'xg', label: 'xG' }] as const).map((filter) => <button type="button" key={filter.id} className={`league-filter ${tableMode === filter.id ? 'league-filter-active' : ''} ${filter.id === 'xg' ? 'league-filter-unavailable' : ''}`} aria-pressed={tableMode === filter.id} onClick={() => setTableMode(filter.id)}>{filter.label}{filter.id === 'xg' && <small>not tracked</small>}</button>)}
           </div>
@@ -193,6 +237,10 @@ export function CompetitionCentrePage() {
           {!matches.length ? <div className="league-empty"><CalendarDays size={18} /><strong>No published fixtures</strong><span>Fixtures will appear here when they’re published.</span></div> : <div className="league-fixture-groups">{groupedFixtures.map(([date, fixtureRows]) => <section className="league-fixture-group" key={date}>
             <h3>{date}</h3><div>{fixtureRows.map((match) => <FixtureRow match={match} teams={teams} key={match.id} />)}</div>
           </section>)}</div>}
+        </section>}
+
+        {activeTab === 'knockout' && <section className="league-content-section">
+          {knockoutError ? <div className="league-empty"><CircleDot size={18} /><strong>Knockout bracket unavailable</strong><span>Couldn’t load the published tournament rounds.</span></div> : <PublicKnockoutBracket stages={knockoutStages} teams={teams} />}
         </section>}
 
         {activeTab === 'players' && <section className="league-content-section">

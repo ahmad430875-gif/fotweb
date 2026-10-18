@@ -630,6 +630,39 @@
 .league-badge img{width:100%;height:100%;object-fit:contain}
 .tcc-qualifier-control{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:10px 0}
 .tcc-qualifier-control>.tcc-field{width:min(100%,280px)}
+.tcc-knockout-publication{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:11px 12px;border:1px solid var(--line-soft);border-radius:4px;background:#f8faf7}
+.tcc-knockout-publication>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.tcc-knockout-publication strong{color:var(--text);font-size:11px}
+.tcc-knockout-publication span{color:var(--muted);font-size:9px}
+.tcc-compact-list select{height:29px;max-width:130px;padding:0 6px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--text);font:600 9px 'DM Sans',sans-serif}
+.league-knockout-stages{display:flex;flex-direction:column;gap:18px}
+.league-knockout-stage{padding:8px 0 20px;border-bottom:1px solid #dfe6de}
+.league-knockout-scroll{overflow-x:auto;padding:4px 0 12px}
+.league-knockout-bracket{display:flex;align-items:stretch;gap:34px;min-width:max-content;padding:3px 5px}
+.league-knockout-round{width:245px;display:flex;flex-direction:column;gap:12px}
+.league-knockout-round>h3{margin:0;padding:0 0 8px;border-bottom:1px solid #dfe6de;color:#52665a;font-size:10px;font-weight:700}
+.league-knockout-round-matches{min-height:130px;display:flex;flex:1;flex-direction:column;justify-content:space-around;gap:16px}
+.league-knockout-match{position:relative;display:flex;flex-direction:column;padding:5px 9px;border:1px solid #dfe6de;border-radius:5px;background:#fff;transition:border-color 130ms ease,background 130ms ease}
+.league-knockout-match:hover{border-color:#9bb49e;background:#f9fbf8}
+.league-knockout-round:not(:last-child) .league-knockout-match:after,.league-knockout-round:not(:last-child) .league-knockout-placeholder:after{position:absolute;top:50%;right:-35px;width:34px;border-top:1px solid #bdcbbd;content:''}
+.league-knockout-team{min-width:0;min-height:34px;display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:7px;border-bottom:1px solid #edf0eb;color:#68756d}
+.league-knockout-team:last-of-type{border-bottom:0}
+.league-knockout-team img,.league-knockout-team-mark{width:21px;height:21px;display:grid;place-items:center;border-radius:50%;background:#edf2eb;color:#536a58;font-size:7px;font-weight:700;object-fit:contain}
+.league-knockout-team strong{overflow:hidden;font-size:10px;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
+.league-knockout-team>b{font-size:10px;font-variant-numeric:tabular-nums}
+.league-knockout-team-winner{color:#24583a}
+.league-knockout-team-winner strong,.league-knockout-team-winner>b{font-weight:700}
+.league-knockout-match>small{padding:5px 0 2px;color:#849087;font-size:8px;text-align:center;text-transform:uppercase}
+.league-knockout-placeholder{position:relative;min-height:78px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:7px;padding:9px;border:1px dashed #cbd5c9;border-radius:5px;background:#f8faf7;color:#78857b;font-size:8px;text-align:center}
+.league-knockout-placeholder strong{color:#9aa69b;font-size:8px}
+.league-knockout-champion{width:min(100%,460px);min-height:68px;display:flex;align-items:center;gap:12px;margin:16px auto 0;padding:12px 15px;border:1px solid #d8c785;border-radius:5px;background:#fbf8e9;color:#8b7021}
+.league-knockout-champion>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:4px}
+.league-knockout-champion small{font-size:8px;font-weight:700;letter-spacing:.08em}
+.league-knockout-champion strong{overflow:hidden;color:#38442b;font-size:13px;text-overflow:ellipsis;white-space:nowrap}
+.league-knockout-champion img{width:32px;height:32px;object-fit:contain}
+.league-knockout-empty{min-height:90px;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:1px dashed #d7e0d5;border-radius:5px;color:#748177;font-size:10px;text-align:center}
+.league-knockout-empty svg{color:#6e8b6e}
+@media(max-width:600px){.tcc-knockout-publication{align-items:flex-start;flex-direction:column}.tcc-knockout-publication .button{width:100%}.league-knockout-bracket{gap:25px}.league-knockout-round{width:220px}.league-knockout-round:not(:last-child) .league-knockout-match:after,.league-knockout-round:not(:last-child) .league-knockout-placeholder:after{right:-26px;width:25px}}
 .league-hero-copy{min-width:0}
 .league-hero-copy h1{margin:4px 0 5px;color:#1e2925;font:700 30px/1.12 'DM Sans',sans-serif;overflow-wrap:anywhere}
 .league-hero-copy p{margin:0;color:#627269;font-size:12px}

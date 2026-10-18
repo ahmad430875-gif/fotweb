@@ -8,7 +8,7 @@ import { InstitutionalEligibilityCheck } from './InstitutionalEligibilityCheck'
 import { TournamentBracketView, type BracketFixture, type BracketRound } from './TournamentBracketView'
 import './SecretaryControlCenter.css'
 
-type Competition = { id: string; name: string; season: string; ended_at: string | null; qualifiers_per_group: number }
+type Competition = { id: string; name: string; season: string; ended_at: string | null; qualifiers_per_group: number; knockout_published: boolean }
 type Team = { id: string; name: string; group_name: string | null }
 type GroupStanding = {
   position: number
@@ -110,7 +110,7 @@ export function SecretaryControlCenter() {
       setLoading(true)
       const { data, error: loadError } = await supabase
         .from('competitions')
-        .select('id, name, season, ended_at, qualifiers_per_group')
+        .select('id, name, season, ended_at, qualifiers_per_group, knockout_published')
         .eq('university_id', universityId)
         .order('start_date', { ascending: false })
       if (!active) return
@@ -295,6 +295,28 @@ export function SecretaryControlCenter() {
     }
   }
 
+  async function updateStageType(stageId: string, stageType: Stage['stage_type']) {
+    if (!supabase || !competitionId) return
+    const client = supabase
+    await runAction(async () => await client.from('tournament_stages')
+      .update({ stage_type: stageType })
+      .eq('id', stageId), 'Tournament stage type updated.')
+  }
+
+  async function toggleKnockoutPublication() {
+    if (!supabase || !competition) return
+    const nextValue = !competition.knockout_published
+    const client = supabase
+    const saved = await runAction(async () => await client.from('competitions')
+      .update({ knockout_published: nextValue })
+      .eq('id', competition.id), nextValue ? 'Knockout bracket published.' : 'Knockout bracket unpublished.')
+    if (saved) {
+      setCompetitions((current) => current.map((row) => row.id === competition.id
+        ? { ...row, knockout_published: nextValue }
+        : row))
+    }
+  }
+
   async function seedGroupQualifiers() {
     if (!supabase || !competitionId || !selectedStageId) return
     const client = supabase
@@ -456,7 +478,7 @@ export function SecretaryControlCenter() {
             <button className="button button-primary" disabled={busy}>Add stage</button>
           </form>
           <ol className="tcc-compact-list">
-            {stages.map((stage) => <li key={stage.id}><span>{stage.sequence_order}</span><strong>{stage.name}</strong><small>{stage.stage_type}</small></li>)}
+            {stages.map((stage) => <li key={stage.id}><span>{stage.sequence_order}</span><strong>{stage.name}</strong><label className="sr-only" htmlFor={`stage-type-${stage.id}`}>Stage type for {stage.name}</label><select id={`stage-type-${stage.id}`} value={stage.stage_type} disabled={busy || Boolean(competition?.ended_at)} onChange={(event) => void updateStageType(stage.id, event.target.value as Stage['stage_type'])}><option value="group">Group stage</option><option value="knockout">Knockout stage</option><option value="league">League stage</option></select></li>)}
             {!stages.length && <li className="tcc-list-empty">Your stages will appear here.</li>}
           </ol>
         </section>
@@ -496,7 +518,7 @@ export function SecretaryControlCenter() {
       <div className="tcc-step-stack">
         <section className="tcc-panel">
           <div className="tcc-panel-title"><div><span className="eyebrow">FIXTURES</span><h2>Schedule matches</h2></div><Flag size={18} /></div>
-          <p className="tcc-step-help">Choose a round and two registered teams. Once created, fixtures appear in the bracket below.</p>
+          <p className="tcc-step-help">For manual assignment, choose a knockout round and its two teams. For automatic assignment, select the group stage and use the qualification seeding control below.</p>
           <form className="tcc-form" onSubmit={(event) => void createFixture(event)}>
             <div className="tcc-fixture-form-grid">
               <label className="tcc-field">Round<select value={selectedRoundId} onChange={(event) => setSelectedRoundId(event.target.value)} required><option value="">Select round</option>{rounds.map((round) => <option key={round.id} value={round.id}>{stages.find((stage) => stage.id === round.stage_id)?.name} · {round.name}</option>)}</select></label>
@@ -509,6 +531,10 @@ export function SecretaryControlCenter() {
         </section>
         <section className="tcc-panel">
           <div className="tcc-panel-title"><div><span className="eyebrow">BRACKET</span><h2>Fixture progression</h2></div><Users size={18} /></div>
+          <div className="tcc-knockout-publication">
+            <div><strong>Public knockout view</strong><span>{competition?.knockout_published ? 'Visible on the public competition page.' : 'Hidden from the public competition page.'}</span></div>
+            <button className={`button ${competition?.knockout_published ? 'button-secondary' : 'button-primary'}`} type="button" aria-pressed={Boolean(competition?.knockout_published)} disabled={busy || Boolean(competition?.ended_at) || (!competition?.knockout_published && !stages.some((stage) => stage.stage_type === 'knockout'))} onClick={() => void toggleKnockoutPublication()}>{competition?.knockout_published ? 'Unpublish bracket' : 'Publish bracket'}</button>
+          </div>
           <label className="tcc-field tcc-stage-filter">Stage<select value={selectedStageId} onChange={(event) => setStage(event.target.value)}><option value="">Select stage</option>{stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
           {selectedStage?.stage_type === 'group' && (
             <section className="tcc-qualification-panel">
