@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDownRight, ArrowRight, CalendarDays, CircleDot, Goal, MapPin, ShieldCheck, Trophy } from 'lucide-react'
+import { ArrowDownRight, ArrowRight, CalendarDays, ChevronDown, ChevronRight, CircleDot, Goal, MapPin, ShieldCheck, SlidersHorizontal, Trophy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { FootballLogo } from '../components/FootballLogo'
 import { PwaInstallButton } from '../components/PwaInstallPrompt'
@@ -35,7 +35,8 @@ type PublicTeam = {
   logo_url: string | null
 }
 
-type MatchFilter = 'all' | 'live' | 'upcoming' | 'results'
+type MatchFilter = 'all' | 'upcoming' | 'results' | 'delayed'
+type MatchSort = 'time' | 'priority'
 
 type PublicMatch = {
   id: string
@@ -139,15 +140,32 @@ export function PublicFrame({ children }: { children: React.ReactNode }) {
 export function PublicHomePage() {
   const data = usePublicData()
   const [matchFilter, setMatchFilter] = useState<MatchFilter>('all')
-  const sortedMatches = [...data.matches].sort((first, second) => matchPriority(first) - matchPriority(second))
-  const filteredMatches = sortedMatches.filter((match) => {
-    if (matchFilter === 'live') return match.status === 'live' || match.status === 'half_time'
-    if (matchFilter === 'upcoming') return match.status === 'scheduled' || match.status === 'warm_up'
-    if (matchFilter === 'results') return match.status === 'full_time'
-    return true
+  const [liveOnly, setLiveOnly] = useState(false)
+  const [matchSort, setMatchSort] = useState<MatchSort>('time')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState('')
+  const [collapsedCompetitions, setCollapsedCompetitions] = useState<Set<string>>(() => new Set())
+  const filteredMatches = data.matches.filter((match) => {
+    if (liveOnly && !['live', 'half_time'].includes(match.status)) return false
+    const matchesStatus = matchFilter === 'all'
+      || matchFilter === 'upcoming' && ['scheduled', 'warm_up'].includes(match.status)
+      || matchFilter === 'results' && match.status === 'full_time'
+      || matchFilter === 'delayed' && ['postponed', 'cancelled'].includes(match.status)
+    return matchesStatus && (!selectedDate || localDateKey(new Date(match.kickoff_at)) === selectedDate)
   })
-  const visibleMatches = filteredMatches
+  const visibleMatches = filteredMatches.sort((first, second) => matchSort === 'time'
+    ? first.kickoff_at.localeCompare(second.kickoff_at)
+    : matchPriority(first) - matchPriority(second) || first.kickoff_at.localeCompare(second.kickoff_at))
   const matchGroups = groupMatchesByCompetition(visibleMatches)
+
+  function toggleCompetition(competitionId: string) {
+    setCollapsedCompetitions((current) => {
+      const next = new Set(current)
+      if (next.has(competitionId)) next.delete(competitionId)
+      else next.add(competitionId)
+      return next
+    })
+  }
 
   return (
     <PublicFrame>
@@ -179,14 +197,22 @@ export function PublicHomePage() {
             <Link className="public-inline-link" to="/competitions">Browse competitions <ArrowRight size={15} /></Link>
           </div>
           <div className="public-match-toolbar">
-            <div className="public-match-filters" role="group" aria-label="Filter fixtures">
-              {([{ label: 'All', value: 'all' }, { label: 'Live', value: 'live' }, { label: 'Upcoming', value: 'upcoming' }, { label: 'Results', value: 'results' }] as const).map((filter) => (
-                <button className={`public-match-filter ${matchFilter === filter.value ? 'public-match-filter-active' : ''}`} type="button" key={filter.value} aria-pressed={matchFilter === filter.value} onClick={() => setMatchFilter(filter.value)}>
-                  {filter.label}
-                </button>
-              ))}
+            <div className="public-match-control-strip" role="group" aria-label="Match centre controls">
+              <button className={`public-match-filter ${liveOnly ? 'public-match-filter-active' : ''}`} type="button" aria-pressed={liveOnly} onClick={() => setLiveOnly((current) => !current)}><span className="public-live-control-dot" />Live</button>
+              <button className={`public-match-filter ${matchSort === 'time' ? 'public-match-filter-active' : ''}`} type="button" aria-pressed={matchSort === 'time'} onClick={() => setMatchSort((current) => current === 'time' ? 'priority' : 'time')}><CalendarDays size={13} />{matchSort === 'time' ? 'By time' : 'Live first'}</button>
+              <button className={`public-match-filter ${filterOpen || matchFilter !== 'all' ? 'public-match-filter-active' : ''}`} type="button" aria-expanded={filterOpen} onClick={() => setFilterOpen((current) => !current)}><SlidersHorizontal size={13} />Filter</button>
             </div>
-            <span className="public-match-sort"><CalendarDays size={14} /> By kickoff time</span>
+            <div className="public-match-days" role="group" aria-label="Filter fixtures by date">
+              <button className={`public-match-day ${selectedDate === '' ? 'public-match-day-active' : ''}`} type="button" aria-pressed={selectedDate === ''} onClick={() => setSelectedDate('')}>All dates</button>
+              {([-1, 0, 1] as const).map((offset) => {
+                const day = dateOffset(offset)
+                return <button className={`public-match-day ${selectedDate === day.value ? 'public-match-day-active' : ''}`} type="button" key={offset} aria-pressed={selectedDate === day.value} onClick={() => setSelectedDate(day.value)}>{day.label}</button>
+              })}
+              <label className="public-match-date-picker"><CalendarDays size={13} /><span className="sr-only">Choose match date</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} aria-label="Choose match date" /></label>
+            </div>
+            {filterOpen && <label className="public-match-filter-menu">Match status<select value={matchFilter} onChange={(event) => setMatchFilter(event.target.value as MatchFilter)}>
+              <option value="all">All matches</option><option value="upcoming">Upcoming</option><option value="results">Results</option><option value="delayed">Postponed or cancelled</option>
+            </select></label>}
           </div>
           {data.error && <PublicNotice message="Match data is temporarily unavailable." />}
           {!data.error && !data.loading && visibleMatches.length === 0 && (
@@ -200,13 +226,15 @@ export function PublicHomePage() {
             const competition = data.competitions.find((item) => item.id === competitionId)
             const university = data.universities.find((item) => item.id === competition?.university_id)
             return <section className="public-match-group" key={competitionId}>
-              <Link className="public-match-group-heading" to={`/competitions/${competitionId}`}>
-                <span className="public-match-group-mark"><Trophy size={16} /></span>
-                <span className="public-match-group-copy"><strong>{competition?.name ?? 'University football'}</strong><small>{university?.name ?? 'Competition fixtures'}</small></span>
-                <span className="public-match-group-count">{matches.length} {matches.length === 1 ? 'match' : 'matches'}</span>
-                <ArrowRight size={15} />
-              </Link>
-              <div className="public-match-list">{matches.map((match) => <MatchRow key={match.id} match={match} teams={data.teams} />)}</div>
+              <div className="public-match-group-heading">
+                <Link className="public-match-group-link" to={`/competitions/${competitionId}`}>
+                  <span className="public-match-group-mark"><Trophy size={16} /></span>
+                  <span className="public-match-group-copy"><strong>{competition?.name ?? 'University football'}</strong><small>{university?.name ?? 'Competition fixtures'}</small></span>
+                </Link>
+                <span className="public-match-group-count">{matches.length}</span>
+                <button className="public-match-collapse" type="button" aria-label={`${collapsedCompetitions.has(competitionId) ? 'Expand' : 'Collapse'} ${competition?.name ?? 'competition'} fixtures`} aria-expanded={!collapsedCompetitions.has(competitionId)} onClick={() => toggleCompetition(competitionId)}>{collapsedCompetitions.has(competitionId) ? <ChevronRight size={17} /> : <ChevronDown size={17} />}</button>
+              </div>
+              {!collapsedCompetitions.has(competitionId) && <div className="public-match-list">{matches.map((match) => <MatchRow key={match.id} match={match} teams={data.teams} />)}</div>}
             </section>
           })}</div>}
         </section>
@@ -377,7 +405,11 @@ function MatchRow({ match, teams }: { match: PublicMatch; teams: PublicTeam[] })
   const status = match.status === 'half_time' ? 'HT' : live ? 'Live' : finished ? 'FT' : match.status === 'postponed' ? 'Postponed' : match.status === 'cancelled' ? 'Cancelled' : 'Upcoming'
   const showScore = live || finished
   const centerValue = showScore ? `${match.home_score} - ${match.away_score}` : formatKickoffClock(match.kickoff_at)
-  const centerDetail = match.round || (live ? 'In progress' : match.venue || formatDate(match.kickoff_at))
+  const centerDetail = live
+    ? match.round || 'In progress'
+    : finished
+      ? formatDate(match.kickoff_at)
+      : [formatDate(match.kickoff_at), match.round || match.venue].filter(Boolean).join(' · ')
 
   return (
     <Link className={`public-match-card public-match-card-${state}`} to={`/matches/${match.id}`}>
@@ -425,6 +457,17 @@ function formatDate(value: string) {
 
 function formatKickoffClock(value: string) {
   return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(value))
+}
+
+function localDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function dateOffset(offset: -1 | 0 | 1) {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  const label = offset === -1 ? 'Yesterday' : offset === 0 ? 'Today' : 'Tomorrow'
+  return { label, value: localDateKey(date) }
 }
 
 function groupMatchesByCompetition(matches: PublicMatch[]) {
