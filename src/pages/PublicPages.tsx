@@ -147,6 +147,7 @@ export function PublicHomePage() {
     return true
   })
   const visibleMatches = filteredMatches
+  const matchGroups = groupMatchesByCompetition(visibleMatches)
 
   return (
     <PublicFrame>
@@ -195,7 +196,19 @@ export function PublicHomePage() {
               <span>{matchFilter === 'all' ? 'Match schedules and results will appear here.' : 'Try another match filter.'}</span>
             </div>
           )}
-          {data.loading ? <div className="public-loading">Loading the latest from campus football…</div> : <div className="public-match-list">{visibleMatches.map((match) => <MatchRow key={match.id} match={match} teams={data.teams} competitions={data.competitions} />)}</div>}
+          {data.loading ? <div className="public-loading">Loading the latest from campus football…</div> : <div className="public-match-groups">{matchGroups.map(([competitionId, matches]) => {
+            const competition = data.competitions.find((item) => item.id === competitionId)
+            const university = data.universities.find((item) => item.id === competition?.university_id)
+            return <section className="public-match-group" key={competitionId}>
+              <Link className="public-match-group-heading" to={`/competitions/${competitionId}`}>
+                <span className="public-match-group-mark"><Trophy size={16} /></span>
+                <span className="public-match-group-copy"><strong>{competition?.name ?? 'University football'}</strong><small>{university?.name ?? 'Competition fixtures'}</small></span>
+                <span className="public-match-group-count">{matches.length} {matches.length === 1 ? 'match' : 'matches'}</span>
+                <ArrowRight size={15} />
+              </Link>
+              <div className="public-match-list">{matches.map((match) => <MatchRow key={match.id} match={match} teams={data.teams} />)}</div>
+            </section>
+          })}</div>}
         </section>
 
         <section className="public-section public-competitions-section">
@@ -355,36 +368,29 @@ function CompetitionCard({ competition, universities }: { competition: PublicCom
   )
 }
 
-function MatchRow({ match, teams, competitions }: { match: PublicMatch; teams: PublicTeam[]; competitions: PublicCompetition[] }) {
+function MatchRow({ match, teams }: { match: PublicMatch; teams: PublicTeam[] }) {
   const home = teams.find((team) => team.id === match.home_team_id)
   const away = teams.find((team) => team.id === match.away_team_id)
-  const competition = competitions.find((item) => item.id === match.competition_id)
   const live = ['live', 'half_time'].includes(match.status)
-  const scored = live || match.status === 'full_time'
-  const status = live ? (match.status === 'half_time' ? 'Half-time' : 'Live') : (match.status === 'full_time' ? 'Full time' : formatDate(match.kickoff_at))
+  const finished = match.status === 'full_time'
+  const state = live ? 'live' : finished ? 'finished' : ['postponed', 'cancelled'].includes(match.status) ? 'delayed' : 'upcoming'
+  const status = match.status === 'half_time' ? 'HT' : live ? 'Live' : finished ? 'FT' : match.status === 'postponed' ? 'Postponed' : match.status === 'cancelled' ? 'Cancelled' : 'Upcoming'
+  const supportingTime = live ? (match.status === 'half_time' ? 'Half-time' : 'In progress') : finished ? formatDate(match.kickoff_at) : formatKickoffTime(match.kickoff_at)
+  const showScore = live || finished
 
   return (
-    <Link className="public-match-row" to={`/matches/${match.id}`}>
-      <div className="public-match-context">
-        <span className={live ? 'public-live-label' : 'public-match-date'}>
-          {live && <i />}
-          {status}
-        </span>
-        <span>{competition?.name ?? 'University football'}</span>
+    <Link className={`public-match-card public-match-card-${state}`} to={`/matches/${match.id}`}>
+      <div className="public-match-card-time">
+        <span className={`public-match-state public-match-state-${state}`}>{live && <i />}{status}</span>
+        <time>{supportingTime}</time>
       </div>
-      <div className="public-match-teams">
-        <div>
-          <span className="public-team-crest">{home?.logo_url ? <img src={publicImageUrl(home.logo_url)} alt="" /> : (home?.short_name ?? 'TBC').slice(0, 3)}</span>
-          <strong>{home?.name ?? 'Team to be announced'}</strong>
-        </div>
-        <div>
-          <span className="public-team-crest">{away?.logo_url ? <img src={publicImageUrl(away.logo_url)} alt="" /> : (away?.short_name ?? 'TBC').slice(0, 3)}</span>
-          <strong>{away?.name ?? 'Team to be announced'}</strong>
-        </div>
+      <div className="public-match-card-teams">
+        <div><span className="public-team-crest">{home?.logo_url ? <img src={publicImageUrl(home.logo_url)} alt="" /> : (home?.short_name ?? 'TBC').slice(0, 3)}</span><strong>{home?.name ?? 'Team to be announced'}</strong></div>
+        <div><span className="public-team-crest">{away?.logo_url ? <img src={publicImageUrl(away.logo_url)} alt="" /> : (away?.short_name ?? 'TBC').slice(0, 3)}</span><strong>{away?.name ?? 'Team to be announced'}</strong></div>
       </div>
-      <div className="public-match-score">
-        <strong>{scored ? `${match.home_score} : ${match.away_score}` : 'v'}</strong>
-        <span>{match.round || (match.venue ? match.venue : 'Match day')}</span>
+      <div className="public-match-card-result">
+        <strong>{showScore ? `${match.home_score} : ${match.away_score}` : 'vs'}</strong>
+        <span>{match.round || match.venue || 'Match day'}</span>
       </div>
     </Link>
   )
@@ -413,6 +419,16 @@ function formatLabel(value: string) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(new Date(value))
+}
+
+function formatKickoffTime(value: string) {
+  return new Intl.DateTimeFormat('en', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(value))
+}
+
+function groupMatchesByCompetition(matches: PublicMatch[]) {
+  const groups = new Map<string, PublicMatch[]>()
+  matches.forEach((match) => groups.set(match.competition_id, [...(groups.get(match.competition_id) ?? []), match]))
+  return [...groups.entries()]
 }
 
 function matchPriority(match: PublicMatch) {
