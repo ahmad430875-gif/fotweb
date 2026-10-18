@@ -16,6 +16,9 @@ create table public.competition_participants (
 create index competition_participants_university_idx
   on public.competition_participants(university_id, participation_status);
 
+alter table public.match_brackets
+  add column if not exists match_id uuid references public.matches(id) on delete cascade;
+
 create or replace function public.can_manage_competition(target_competition uuid)
 returns boolean
 language sql
@@ -933,9 +936,6 @@ create policy match_cards_secretary_all on public.match_cards
         and public.can_manage_competition_team(pr.competition_id, pr.team_id)
     )
   );
-
-alter table public.match_brackets
-  add column if not exists match_id uuid references public.matches(id) on delete cascade;
 
 alter table public.matches
   add column if not exists score_source text not null default 'events';
