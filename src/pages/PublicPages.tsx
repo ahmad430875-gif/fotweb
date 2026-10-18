@@ -375,22 +375,24 @@ function MatchRow({ match, teams }: { match: PublicMatch; teams: PublicTeam[] })
   const finished = match.status === 'full_time'
   const state = live ? 'live' : finished ? 'finished' : ['postponed', 'cancelled'].includes(match.status) ? 'delayed' : 'upcoming'
   const status = match.status === 'half_time' ? 'HT' : live ? 'Live' : finished ? 'FT' : match.status === 'postponed' ? 'Postponed' : match.status === 'cancelled' ? 'Cancelled' : 'Upcoming'
-  const supportingTime = live ? (match.status === 'half_time' ? 'Half-time' : 'In progress') : finished ? formatDate(match.kickoff_at) : formatKickoffTime(match.kickoff_at)
   const showScore = live || finished
+  const centerValue = showScore ? `${match.home_score} - ${match.away_score}` : formatKickoffClock(match.kickoff_at)
+  const centerDetail = match.round || (live ? 'In progress' : match.venue || formatDate(match.kickoff_at))
 
   return (
     <Link className={`public-match-card public-match-card-${state}`} to={`/matches/${match.id}`}>
-      <div className="public-match-card-time">
-        <span className={`public-match-state public-match-state-${state}`}>{live && <i />}{status}</span>
-        <time>{supportingTime}</time>
-      </div>
-      <div className="public-match-card-teams">
-        <div><span className="public-team-crest">{home?.logo_url ? <img src={publicImageUrl(home.logo_url)} alt="" /> : (home?.short_name ?? 'TBC').slice(0, 3)}</span><strong>{home?.name ?? 'Team to be announced'}</strong></div>
-        <div><span className="public-team-crest">{away?.logo_url ? <img src={publicImageUrl(away.logo_url)} alt="" /> : (away?.short_name ?? 'TBC').slice(0, 3)}</span><strong>{away?.name ?? 'Team to be announced'}</strong></div>
+      <div className="public-match-card-team public-match-card-home">
+        <strong>{home?.name ?? 'Team to be announced'}</strong>
+        <span className="public-team-crest">{home?.logo_url ? <img src={publicImageUrl(home.logo_url)} alt="" /> : (home?.short_name ?? 'TBC').slice(0, 3)}</span>
       </div>
       <div className="public-match-card-result">
-        <strong>{showScore ? `${match.home_score} : ${match.away_score}` : 'vs'}</strong>
-        <span>{match.round || match.venue || 'Match day'}</span>
+        <span className={`public-match-state public-match-state-${state}`}>{live && <i />}{status}</span>
+        <strong>{centerValue}</strong>
+        <span>{centerDetail}</span>
+      </div>
+      <div className="public-match-card-team public-match-card-away">
+        <span className="public-team-crest">{away?.logo_url ? <img src={publicImageUrl(away.logo_url)} alt="" /> : (away?.short_name ?? 'TBC').slice(0, 3)}</span>
+        <strong>{away?.name ?? 'Team to be announced'}</strong>
       </div>
     </Link>
   )
@@ -421,8 +423,8 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(new Date(value))
 }
 
-function formatKickoffTime(value: string) {
-  return new Intl.DateTimeFormat('en', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(value))
+function formatKickoffClock(value: string) {
+  return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(value))
 }
 
 function groupMatchesByCompetition(matches: PublicMatch[]) {
