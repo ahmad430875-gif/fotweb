@@ -447,6 +447,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
       const { data, error: loadError } = await supabase
         .from('competitions')
         .select(config.select)
+        .eq('university_id', universityId)
         .order(config.order, { ascending: false })
         .limit(500)
       if (loadError) {
