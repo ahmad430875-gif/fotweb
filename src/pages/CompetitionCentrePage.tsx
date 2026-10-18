@@ -198,7 +198,8 @@ export function CompetitionCentrePage() {
 
       <div className="league-tab-panel" role="tabpanel" id={`league-panel-${activeTab}`} aria-labelledby={`league-tab-${activeTab}`}>
         {activeTab === 'table' && <section className="league-content-section">
-          <div className="league-section-heading"><div><span className="public-overline">{competition.season} SEASON</span><h2>{competition.knockout_published ? 'Group stage · final table' : 'League table'}</h2></div><span className="league-team-total">{fullStandings.length} teams</span></div>
+          <div className="league-section-heading"><div><span className="public-overline">{competition.season} SEASON</span><h2>{groupStandings.length ? 'Group standings' : competition.knockout_published ? 'Group stage · final table' : 'League table'}</h2></div><span className="league-team-total">{groupStandings.length ? `${groupStandings.length} teams · ${new Set(groupStandings.map((row) => row.group_name)).size} groups` : `${fullStandings.length} teams`}</span></div>
+          {!groupStandings.length && <>
           <div className="league-filters" role="group" aria-label="Table split">
             {([{ id: 'all', label: 'All' }, { id: 'home', label: 'Home' }, { id: 'away', label: 'Away' }, { id: 'xg', label: 'xG' }] as const).map((filter) => <button type="button" key={filter.id} className={`league-filter ${tableMode === filter.id ? 'league-filter-active' : ''} ${filter.id === 'xg' ? 'league-filter-unavailable' : ''}`} aria-pressed={tableMode === filter.id} onClick={() => setTableMode(filter.id)}>{filter.label}{filter.id === 'xg' && <small>not tracked</small>}</button>)}
           </div>
@@ -217,15 +218,18 @@ export function CompetitionCentrePage() {
               </tr>
             })}</tbody>
           </table></div>}
+          </>}
           {groupStandings.length > 0 && <section className="league-group-tables">
             <div className="league-section-heading"><div><span className="public-overline">GROUP STAGE</span><h2>Qualification tables</h2></div><span className="league-team-total">Top {competition.qualifiers_per_group} advance</span></div>
             {[...new Set(groupStandings.map((row) => row.group_name))].map((groupName) => <div className="league-group-table" key={groupName}>
               <h3>Group {groupName}</h3>
               <div className="league-table-wrap"><table className="league-table"><thead><tr><th>#</th><th>Team</th><th>PL</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>PTS</th><th>Qualification</th></tr></thead><tbody>
-                {groupStandings.filter((row) => row.group_name === groupName).map((row) => <tr className={row.qualified ? 'league-row-qualified' : ''} key={row.team_id}>
+                {groupStandings.filter((row) => row.group_name === groupName).map((row) => {
+                  const qualified = row.position <= competition.qualifiers_per_group
+                  return <tr className={qualified ? 'league-row-qualified' : ''} key={row.team_id}>
                   <td>{row.position}</td><td><Link className="league-team-cell" to={`/teams/${row.team_id}`}><span className="league-team-badge">{row.logo_url ? <img src={publicImageUrl(row.logo_url)} alt="" /> : <Shield size={16} />}</span><strong>{row.team_name}</strong></Link></td>
-                  <td>{row.played}</td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td><td>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</td><td><strong>{row.points}</strong></td><td>{row.qualified ? 'Qualified' : '—'}</td>
-                </tr>)}
+                  <td>{row.played}</td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td><td>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</td><td><strong>{row.points}</strong></td><td>{qualified ? 'Qualified' : '—'}</td>
+                </tr>})}
               </tbody></table></div>
             </div>)}
           </section>}

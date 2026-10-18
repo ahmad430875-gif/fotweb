@@ -549,13 +549,16 @@ export function SecretaryControlCenter() {
                 <div className="tcc-group-table" key={groupName}>
                   <h4>Group {groupName}</h4>
                   <div className="tcc-group-table-scroll"><table><thead><tr><th>#</th><th>Team</th><th>PL</th><th>GD</th><th>PTS</th><th>Advance</th></tr></thead><tbody>
-                    {rows.map((row) => <tr className={row.qualified ? 'tcc-group-qualified' : ''} key={row.team_id}>
-                      <td>{row.position}</td><td>{row.team_name}</td><td>{row.played}</td><td>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</td><td><strong>{row.points}</strong></td><td>{row.qualified ? 'Qualified' : '—'}</td>
-                    </tr>)}
+                    {rows.map((row) => {
+                      const qualified = row.position <= (competition?.qualifiers_per_group ?? 4)
+                      return <tr className={qualified ? 'tcc-group-qualified' : ''} key={row.team_id}>
+                        <td>{row.position}</td><td>{row.team_name}</td><td>{row.played}</td><td>{row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}</td><td><strong>{row.points}</strong></td><td>{qualified ? 'Qualified' : '—'}</td>
+                      </tr>
+                    })}
                   </tbody></table></div>
                 </div>
               ))}</div> : <p className="tcc-step-help">Assign teams to groups, then record completed group-stage results to populate the tables.</p>}
-              <p className="tcc-step-help">When every group fixture is complete, seed qualified teams into the first knockout round. A single group creates semi-finals; paired groups are cross-seeded by position.</p>
+              <p className="tcc-step-help">After every group fixture is complete, seed the selected number of teams from each group. Paired groups are cross-seeded by matching position.</p>
               <button className="button button-primary" type="button" disabled={busy || Boolean(competition?.ended_at) || !Object.keys(groupTables).length} onClick={() => void seedGroupQualifiers()}><Flag size={15} />Qualify top {competition?.qualifiers_per_group ?? 4} &amp; seed bracket</button>
             </section>
           )}
