@@ -1,4 +1,4 @@
-const CACHE_NAME = 'touchline-shell-v1'
+const CACHE_NAME = 'fotweb-shell-v1'
 const APP_ROOT = new URL('./', self.location.href).toString()
 const INDEX_URL = new URL('index.html', APP_ROOT).toString()
 
@@ -8,7 +8,7 @@ self.addEventListener('install', (event) => {
       .then(async (cache) => {
         await cache.addAll([APP_ROOT, INDEX_URL])
         const index = await cache.match(INDEX_URL)
-        if (!index) throw new Error('Touchline app shell could not be cached.')
+        if (!index) throw new Error('FOTWEB app shell could not be cached.')
         const html = await index.text()
         const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)]
           .map((match) => new URL(match[1], APP_ROOT))
@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => key.startsWith('touchline-shell-') && key !== CACHE_NAME)
+          .filter((key) => (key.startsWith('fotweb-shell-') || key.startsWith('touchline-shell-')) && key !== CACHE_NAME)
           .map((key) => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),

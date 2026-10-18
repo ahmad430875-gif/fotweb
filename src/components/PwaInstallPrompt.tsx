@@ -7,22 +7,28 @@ interface InstallPromptEvent extends Event {
 }
 
 let pendingInstallPrompt: InstallPromptEvent | null = null
+const installPromptListeners = new Set<(event: InstallPromptEvent) => void>()
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (event: Event) => {
+    event.preventDefault()
+    pendingInstallPrompt = event as InstallPromptEvent
+    installPromptListeners.forEach((listener) => listener(pendingInstallPrompt!))
+  })
+}
 
 export function PwaInstallButton() {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(pendingInstallPrompt)
   const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => {
-    function handleInstallPrompt(event: Event) {
-      event.preventDefault()
-      pendingInstallPrompt = event as InstallPromptEvent
-      setInstallPrompt(pendingInstallPrompt)
+    function handleInstallPrompt(event: InstallPromptEvent) {
+      setInstallPrompt(event)
       setHelpOpen(false)
     }
-
-    window.addEventListener('beforeinstallprompt', handleInstallPrompt)
+    installPromptListeners.add(handleInstallPrompt)
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleInstallPrompt)
+      installPromptListeners.delete(handleInstallPrompt)
     }
   }, [])
 

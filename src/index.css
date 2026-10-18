@@ -108,11 +108,7 @@ a {
 
 @media (max-width: 440px) {
   .pwa-install-button {
-    width: 40px;
-    padding: 0;
-  }
-
-  .pwa-install-button > span {
-    display: none;
+    max-width: 100%;
+    padding-inline: 10px;
   }
 }

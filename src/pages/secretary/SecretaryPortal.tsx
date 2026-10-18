@@ -4,7 +4,6 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useAuth } from '../../auth/AuthProvider'
 import { universityPortalPath, useUniversityScope } from '../../auth/useUniversityScope'
 import { FootballLogo } from '../../components/FootballLogo'
-import { PwaInstallButton } from '../../components/PwaInstallPrompt'
 import { supabase } from '../../lib/supabase'
 import { publicImageUrl } from '../../lib/imageUrl'
 import './SecretaryPortal.css'
@@ -173,7 +172,7 @@ export function SecretaryLayout() {
               <span>{scope ? 'Super Admin' : 'University'}</span><span>/</span><strong>{location.pathname.includes('/control-center') ? 'Tournament Control' : navigationGroups.flatMap(({ items }) => items).find((item) => universityPortalPath(basePath, item.to.slice('/secretary'.length)) === location.pathname)?.label ?? 'Operations'}</strong>
             </div>
           </div>
-          <div className="secretary-topbar-actions"><span className="secretary-secure"><i /> {scope ? 'Super Admin access' : 'University access'}</span><PwaInstallButton /><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div>
+          <div className="secretary-topbar-actions"><span className="secretary-secure"><i /> {scope ? 'Super Admin access' : 'University access'}</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div>
         </header>
         <div className="secretary-content">
           <Outlet context={{ universityName }} />

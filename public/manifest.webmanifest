@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Touchline | Football scores & news",
-  "short_name": "Touchline",
-  "description": "Live football scores, matchday fixtures and the stories behind the game.",
+  "name": "FOTWEB | University Football",
+  "short_name": "FOTWEB",
+  "description": "University football competitions, matchday fixtures and results.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -10,7 +10,7 @@
   "theme_color": "#f3f7f5",
   "icons": [
     {
-      "src": "./icons/touchline.svg",
+      "src": "./icons/fotweb.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

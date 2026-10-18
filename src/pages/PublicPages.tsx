@@ -120,7 +120,6 @@ export function PublicFrame({ children }: { children: React.ReactNode }) {
           <Link to="/competitions">Competitions</Link>
           <Link to="/universities">Universities</Link>
         </nav>
-        <PwaInstallButton />
         <Link className="public-admin-link" to="/admin/login">
           <ShieldCheck size={15} />
           <span>Admin sign in</span>
@@ -182,6 +181,7 @@ export function PublicHomePage() {
               <Link className="public-button public-button-light" to="/competitions">Explore competitions <ArrowRight size={16} /></Link>
               <a className="public-text-link" href="#latest">See the latest <ArrowDownRight size={16} /></a>
             </div>
+            <div className="public-home-install"><PwaInstallButton /></div>
           </div>
           <div className="public-hero-index"><span>01</span><span>THE UNIVERSITY GAME</span></div>
           <div className="public-hero-stats" aria-label="Platform totals">

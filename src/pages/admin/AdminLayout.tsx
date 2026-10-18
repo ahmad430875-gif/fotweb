@@ -3,7 +3,6 @@ import { Building2, ChevronDown, Command, LayoutDashboard, LogOut, Menu, Newspap
 import { useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { FootballLogo } from '../../components/FootballLogo'
-import { PwaInstallButton } from '../../components/PwaInstallPrompt'
 
 function currentTitle(pathname: string) {
   if (pathname.startsWith('/admin/news')) return 'News Center'
@@ -40,6 +39,6 @@ export function AdminLayout() {
       <div className="sidebar-coming"><span className="nav-label">PLATFORM DATA</span><p>Manage institutions and published football news across the network.</p></div>
       <div className="sidebar-account"><span className="account-avatar">{(profile?.display_name || session?.user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="account-copy"><strong>{profile?.display_name || 'Platform admin'}</strong><small>{session?.user.email}</small></span></div>
     </aside>
-    <div className="admin-main"><header className="admin-topbar"><div className="topbar-leading"><button className="icon-button mobile-menu-button" type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button><div className="breadcrumbs"><span>Platform</span><span>/</span><strong>{currentTitle(location.pathname)}</strong></div></div><div className="topbar-status"><span><ShieldCheck size={15} /> Super Admin</span><span className="secure-indicator"><i /> Secure session</span><PwaInstallButton /><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div></header><div className="admin-content"><Outlet /></div></div>
+    <div className="admin-main"><header className="admin-topbar"><div className="topbar-leading"><button className="icon-button mobile-menu-button" type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button><div className="breadcrumbs"><span>Platform</span><span>/</span><strong>{currentTitle(location.pathname)}</strong></div></div><div className="topbar-status"><span><ShieldCheck size={15} /> Super Admin</span><span className="secure-indicator"><i /> Secure session</span><button className="button button-secondary portal-logout" type="button" disabled={signingOut} onClick={() => void handleSignOut()}><LogOut size={15} /><span>{signingOut ? 'Signing out…' : 'Log out'}</span></button></div></header><div className="admin-content"><Outlet /></div></div>
   </div>
 }
