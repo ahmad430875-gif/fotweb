@@ -1,0 +1,1 @@
+alter type public.competition_type add value if not exists 'clubfriendly';

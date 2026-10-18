@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3, Building2, CalendarDays, ChevronDown, ChevronRight, CircleDot, CircleHelp, GraduationCap, LayoutDashboard, LogOut, MailPlus, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trophy, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, ChevronDown, ChevronRight, CircleDot, CircleHelp, GraduationCap, LayoutDashboard, LogOut, MailPlus, Megaphone, Menu, Newspaper, Radio, Settings, ShieldCheck, Table2, Trash2, Trophy, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { universityPortalPath, useUniversityScope } from '../../auth/useUniversityScope'
@@ -338,7 +338,7 @@ export function SecretaryDashboardPage() {
 }
 
 const optionSets: Record<string, Option[]> = {
-  competitionType: [{ label: 'Inter-class', value: 'inter_class' }, { label: 'Inter-university', value: 'inter_university' }, { label: 'Inter-college', value: 'inter_college' }, { label: 'Other', value: 'other' }],
+  competitionType: [{ label: 'Inter-class', value: 'inter_class' }, { label: 'Inter-university', value: 'inter_university' }, { label: 'Inter-college', value: 'inter_college' }, { label: 'Club Friendly', value: 'clubfriendly' }, { label: 'Other', value: 'other' }],
   competitionFormat: [{ label: 'League', value: 'league' }, { label: 'Group stage', value: 'group_stage' }, { label: 'Knockout', value: 'knockout' }, { label: 'League + knockout', value: 'league_knockout' }, { label: 'Round robin', value: 'round_robin' }],
   teamType: [{ label: 'University team', value: 'university_team' }, { label: 'Class team', value: 'class_team' }],
   academicYear: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'HO', 'PGr', 'Other'].map((value) => ({ label: value, value })),
@@ -412,7 +412,7 @@ const fieldsByKind: Record<RecordKind, Field[]> = {
 }
 
 const pageCopy: Record<RecordKind, { title: string; description: string; table: string; select: string; order: string; columns: string[] }> = {
-  competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, name, season, type, format, status, start_date, end_date, ended_at, is_primary, is_locked, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
+  competitions: { title: 'Competitions', description: 'Manage university-owned leagues, cups, formats, and seasons.', table: 'competitions', select: 'id, university_id, name, season, type, format, status, start_date, end_date, ended_at, is_primary, is_locked, venue, description, logo_url, banner_url, points_for_win, points_for_draw, points_for_loss', order: 'created_at', columns: ['name', 'season', 'type', 'status'] },
   teams: { title: 'Teams', description: 'Manage university and class teams, then register them in competitions.', table: 'teams', select: 'id, name, short_name, type, academic_class, batch_session, logo_url, team_photo_url, season, coach_name, is_active, is_locked', order: 'name', columns: ['name', 'short_name', 'type', 'academic_class', 'batch_session', 'is_active'] },
   players: { title: 'Players', description: 'Edit one permanent student profile used across every team and competition.', table: 'players', select: 'id, full_name, student_identifier, photo_url, date_of_birth, bio, academic_program, current_academic_year, batch_session, academic_enrollment_status, height_cm, position, preferred_foot, injury_status, public_injury_status, is_available, is_active, is_locked', order: 'full_name', columns: ['full_name', 'academic_program', 'current_academic_year', 'batch_session', 'academic_enrollment_status', 'position', 'injury_status', 'is_available'] },
   matches: { title: 'Fixtures', description: 'Schedule, publish, and prepare fixtures for the live match centre.', table: 'matches', select: 'id, competition_id, home_team_id, away_team_id, kickoff_at, status, round, venue, referee, published_at, is_locked', order: 'kickoff_at', columns: ['kickoff_at', 'home_team_id', 'away_team_id', 'status'] },
@@ -425,9 +425,11 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   const scope = useUniversityScope()
   const universityId = scope?.universityId ?? profile?.university_id
   const basePath = scope?.basePath ?? '/secretary'
+  const isSuperAdmin = profile?.role === 'super_admin' && Boolean(scope)
   const config = pageCopy[kind]
   const [rows, setRows] = useState<Row[]>([])
   const [teamOptions, setTeamOptions] = useState<Option[]>([])
+  const [friendlyTeamOptions, setFriendlyTeamOptions] = useState<Option[]>([])
   const [managedTeamOptions, setManagedTeamOptions] = useState<Option[]>([])
   const [competitionOptions, setCompetitionOptions] = useState<Option[]>([])
   const [managedCompetitionOptions, setManagedCompetitionOptions] = useState<Option[]>([])
@@ -442,6 +444,75 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   async function loadRows() {
     if (!supabase || !universityId) { setLoading(false); return }
     setLoading(true)
+    if (kind === 'competitions' && isSuperAdmin) {
+      const { data, error: loadError } = await supabase
+        .from('competitions')
+        .select(config.select)
+        .order(config.order, { ascending: false })
+        .limit(500)
+      if (loadError) {
+        setRows([])
+        setError(`Tournaments could not be loaded: ${loadError.message}`)
+      } else {
+        setRows((data ?? []) as unknown as Row[])
+        setError('')
+      }
+      setLoading(false)
+      return
+    }
+    if (kind === 'matches' && isSuperAdmin) {
+      const [competitionResult, matchResult, entryResult, allTeamResult] = await Promise.all([
+        supabase.from('competitions').select('id, name, university_id').order('start_date', { ascending: false }),
+        supabase.from('matches').select(config.select).order('kickoff_at', { ascending: false }).limit(1000),
+        supabase.from('competition_teams').select('team_id, competition_id, university_id'),
+        supabase.from('teams').select('id, name, university_id, type, universities(name, short_name, is_active)').eq('is_active', true).order('name'),
+      ])
+      const failure = [competitionResult, matchResult, entryResult, allTeamResult].find((result) => result.error)
+      if (failure?.error) {
+        setRows([])
+        setError(`Platform fixtures could not be loaded: ${failure.error.message}`)
+        setLoading(false)
+        return
+      }
+      const competitionRows = competitionResult.data ?? []
+      const matches = (matchResult.data ?? []) as unknown as Row[]
+      const allTeams = allTeamResult.data ?? []
+      const universitiesByTeam = new Map(allTeams.map((team) => {
+        const university = Array.isArray(team.universities) ? team.universities[0] : team.universities
+        return [team.id, university?.short_name ?? university?.name ?? 'University']
+      }))
+      const names = new Map(allTeams.map((team) => [team.id, team.name]))
+      const teamIds = new Set([
+        ...allTeams.map((team) => team.id),
+        ...matches.flatMap((match) => [String(match.home_team_id), String(match.away_team_id)]),
+      ])
+      setTeamOptions([...teamIds].map((id) => ({
+        value: id,
+        label: `${names.get(id) ?? 'Team'} · ${universitiesByTeam.get(id) ?? 'University'}`,
+      })))
+      setFriendlyTeamOptions(allTeams.filter((team) => {
+        const university = Array.isArray(team.universities) ? team.universities[0] : team.universities
+        return team.type === 'university_team' && Boolean(university?.is_active)
+      }).map((team) => ({
+        value: team.id,
+        label: `${team.name} · ${universitiesByTeam.get(team.id) ?? 'University'}`,
+      })))
+      setCompetitionOptions(competitionRows.map((competition) => ({ label: competition.name, value: competition.id })))
+      const localCompetitionIds = new Set(competitionRows.filter((competition) => competition.university_id === universityId).map((competition) => competition.id))
+      setManagedCompetitionOptions(competitionRows
+        .filter((competition) => competition.university_id === universityId)
+        .map((competition) => ({ label: competition.name, value: competition.id })))
+      const localTeamIds = new Set((entryResult.data ?? [])
+        .filter((entry) => localCompetitionIds.has(entry.competition_id))
+        .map((entry) => entry.team_id))
+      setManagedTeamOptions(allTeams
+        .filter((team) => localTeamIds.has(team.id))
+        .map((team) => ({ value: team.id, label: team.name })))
+      setRows(matches)
+      setError('')
+      setLoading(false)
+      return
+    }
     if (kind === 'matches') {
       const { data: ownedCompetitions, error: competitionError } = await supabase
         .from('competitions')
@@ -550,7 +621,9 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   function getFields() {
     return fieldsByKind[kind].map((field) => ({
       ...field,
-      options: field.name === 'home_team_id' || field.name === 'away_team_id'
+      options: field.name === 'type' && !isSuperAdmin
+        ? field.options?.filter((option) => option.value !== 'clubfriendly')
+        : field.name === 'home_team_id' || field.name === 'away_team_id'
         ? kind === 'matches' ? managedTeamOptions : teamOptions
         : field.name === 'competition_id'
           ? kind === 'matches' ? managedCompetitionOptions : competitionOptions
@@ -587,6 +660,69 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     await loadRows()
   }
 
+  async function createFriendlyMatch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!supabase || !universityId || !isSuperAdmin) return
+    const form = event.currentTarget
+    const values = new FormData(form)
+    if (String(values.get('home_team_id')) === String(values.get('away_team_id'))) {
+      setError('Choose two different teams for the friendly match.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const { data, error: createError } = await supabase.rpc('create_club_friendly_match', {
+      target_university: universityId,
+      target_home_team: String(values.get('home_team_id')),
+      target_away_team: String(values.get('away_team_id')),
+      target_kickoff: new Date(String(values.get('kickoff_at'))).toISOString(),
+      target_venue: String(values.get('venue') ?? ''),
+      target_referee: String(values.get('referee') ?? ''),
+    })
+    setBusy(false)
+    if (createError) {
+      setError(friendlyRecordError(createError))
+      return
+    }
+    form.reset()
+    setNotice(`Club Friendly fixture created and published (${String(data).slice(0, 8)}).`)
+    await loadRows()
+  }
+
+  async function deleteFixture(row: Row) {
+    if (!supabase || !isSuperAdmin) return
+    const matchup = `${names[String(row.home_team_id)] ?? 'Home'} vs ${names[String(row.away_team_id)] ?? 'Away'}`
+    if (!window.confirm(`Permanently delete ${matchup}, including its lineups, events, and related stats?`)) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const { error: deleteError } = await supabase.rpc('super_admin_delete_match', { target_match: String(row.id) })
+    setBusy(false)
+    if (deleteError) {
+      setError(friendlyRecordError(deleteError))
+      return
+    }
+    setNotice('Fixture and its related match data were deleted.')
+    await loadRows()
+  }
+
+  async function deleteTournament(row: Row) {
+    if (!supabase || !isSuperAdmin) return
+    if (!window.confirm(`Permanently delete ${String(row.name)}, including every fixture, tournament record, and related stat? This cannot be undone.`)) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const { error: deleteError } = await supabase.rpc('super_admin_delete_competition', { target_competition: String(row.id) })
+    setBusy(false)
+    if (deleteError) {
+      setError(friendlyRecordError(deleteError))
+      return
+    }
+    setNotice('Tournament and all related fixtures and records were deleted.')
+    await loadRows()
+  }
+
   async function updateCompetitionLifecycle(row: Row, action: 'publish' | 'end') {
     if (!supabase || kind !== 'competitions') return
     if (action === 'end' && !window.confirm(`End ${String(row.name)}? Every fixture must be complete. Ending is permanent and makes all tournament data read-only.`)) return
@@ -596,7 +732,10 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
     const update = action === 'publish'
       ? { status: 'published' }
       : { ended_at: new Date().toISOString() }
-    const { error: updateError } = await supabase.from('competitions').update(update).eq('id', String(row.id)).eq('university_id', universityId)
+    const updateResult = isSuperAdmin
+      ? await supabase.from('competitions').update(update).eq('id', String(row.id)).select('id').maybeSingle()
+      : await supabase.from('competitions').update(update).eq('id', String(row.id)).eq('university_id', universityId).select('id').maybeSingle()
+    const updateError = updateResult.error ?? (!updateResult.data ? { message: 'No matching competition was updated.' } : null)
     setBusy(false)
     if (updateError) {
       setError(updateError.message.includes('Every fixture')
@@ -693,7 +832,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
   return (
     <section className="secretary-record-page">
       <div className="secretary-heading">
-        <div><span className="eyebrow">CAMPUS OPERATIONS</span><h1>{config.title}</h1><p>{config.description}</p></div>
+        <div><span className="eyebrow">{isSuperAdmin ? 'PLATFORM OPERATIONS' : 'CAMPUS OPERATIONS'}</span><h1>{config.title}</h1><p>{isSuperAdmin && (kind === 'matches' || kind === 'competitions') ? `Manage ${kind === 'matches' ? 'fixtures' : 'tournaments'} across the platform.` : config.description}</p></div>
         <span className="secretary-record-total">{loading ? 'Loading' : `${rows.length} ${rows.length === 1 ? 'record' : 'records'}`}</span>
       </div>
       {notice && <div className="inline-notice notice-success" role="status">{notice}</div>}
@@ -704,9 +843,24 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             <div><span className="eyebrow">{editingRow ? `EDIT ${singularLabels[kind].toUpperCase()}` : 'NEW RECORD'}</span><h2>{editingRow ? `Edit ${singularLabels[kind]}` : kind === 'matches' ? 'Schedule a fixture' : `Add ${singularLabels[kind]}`}</h2></div>
             <CircleDot size={17} />
           </div>
-          {kind === 'matches' && !managedCompetitionOptions.length ? (
+          {isSuperAdmin && kind === 'matches' && <form className="secretary-record-form secretary-team-registration" onSubmit={(event) => void createFriendlyMatch(event)}>
+            <div className="secretary-panel-heading">
+              <div><span className="eyebrow">CLUB FRIENDLY</span><h2>Create a friendly match</h2></div>
+              <CircleDot size={17} />
+            </div>
+            <div className="secretary-field-grid">
+              <label className="secretary-field">Home team<select name="home_team_id" required defaultValue=""><option value="">Select any university team</option>{friendlyTeamOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+              <label className="secretary-field">Away team<select name="away_team_id" required defaultValue=""><option value="">Select any university team</option>{friendlyTeamOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+              <label className="secretary-field">Kick-off<input name="kickoff_at" type="datetime-local" required /></label>
+              <label className="secretary-field">Venue<input name="venue" placeholder="Optional" /></label>
+              <label className="secretary-field secretary-field-full">Referee<input name="referee" placeholder="Optional" /></label>
+            </div>
+            {!friendlyTeamOptions.length && <p className="secretary-form-note">Active university teams are required to create a friendly fixture.</p>}
+            <button className="button button-primary" type="submit" disabled={busy || friendlyTeamOptions.length < 2}>Create and publish friendly</button>
+          </form>}
+          {kind === 'matches' && !managedCompetitionOptions.length && !isSuperAdmin ? (
             <div className="secretary-empty"><CalendarDays size={20} /><strong>Fixtures are managed by the organizer</strong><span>Your university must be added to a competition before you can see its fixtures. The university organizing each league schedules and publishes matches.</span><Link className="button button-secondary" to={universityPortalPath(basePath, '/leagues')}>Open leagues &amp; invitations</Link></div>
-          ) : <form key={editingRow ? `edit-${String(editingRow.id)}` : `new-${kind}`} className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
+          ) : (kind !== 'matches' || managedCompetitionOptions.length > 0) && <form key={editingRow ? `edit-${String(editingRow.id)}` : `new-${kind}`} className="secretary-record-form" onSubmit={(event) => void createRecord(event)}>
             <div className="secretary-field-grid">
               {fields.map((field) => (
                 <label className={field.full ? 'secretary-field secretary-field-full' : 'secretary-field'} key={field.name}>
@@ -767,7 +921,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
             <div className="secretary-table-wrap">
               <table className="secretary-table">
                 <thead>
-                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}{kind === 'competitions' && <th>Actions</th>}{(kind === 'players' || kind === 'teams' || scope) && <th>Actions</th>}</tr>
+                  <tr>{config.columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}{kind === 'matches' && <th>Public</th>}{kind === 'competitions' && <th>Actions</th>}{(kind === 'players' || kind === 'teams' || (scope && kind !== 'competitions')) && <th>Actions</th>}</tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
@@ -775,25 +929,28 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
                       {config.columns.map((column) => <td key={column}>{kind === 'competitions' && column === 'status'
                         ? row.ended_at ? 'Ended' : String(row.status).replaceAll('_', ' ')
                         : formatCell(kind, column, row[column], names, competitions)}</td>)}
-                      {kind === 'matches' && <td>{managedCompetitionOptions.some((option) => option.value === String(row.competition_id))
+                      {kind === 'matches' && <td>{isSuperAdmin || managedCompetitionOptions.some((option) => option.value === String(row.competition_id))
                         ? <button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => void toggleFixturePublication(row)}>{row.published_at ? 'Unpublish' : 'Publish fixture'}</button>
                         : <span>Organizer controls publication</span>}</td>}
                       {kind === 'competitions' && <td>
-                        {scope && !row.ended_at && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit competition</button>}
+                        {scope && String(row.university_id) === universityId && !row.ended_at && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit competition</button>}
                         {row.ended_at ? <span className="competition-ended-label">Ended · read-only</span>
                           : row.status === 'draft'
                             ? <button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => void updateCompetitionLifecycle(row, 'publish')}>Publish competition</button>
                             : row.status === 'published'
                               ? <button className="secretary-text-action competition-end-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => void updateCompetitionLifecycle(row, 'end')}>End tournament</button>
                               : <span>{String(row.status).replaceAll('_', ' ')}</span>}
+                        {isSuperAdmin && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => void deleteTournament(row)}><Trash2 size={14} /> Delete tournament</button>}
                       </td>}
                       {kind === 'players' && <td><button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope)} onClick={() => editPlayer(row)}>Edit profile</button></td>}
                       {kind === 'teams' && <td>
                         {scope && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit team</button>}
                         <button className="secretary-text-action" type="button" disabled={busy || (Boolean(row.is_locked) && !scope) || !nextAcademicYear(String(row.academic_class ?? ''))} onClick={() => void promoteClassTeam(row)}>{nextAcademicYear(String(row.academic_class ?? '')) ? `Promote to ${nextAcademicYear(String(row.academic_class))}` : row.type === 'class_team' ? 'No next year' : 'University team'}</button>
                       </td>}
-                      {kind === 'matches' && scope && <td>{managedCompetitionOptions.some((option) => option.value === String(row.competition_id))
-                        && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit fixture</button>}</td>}
+                      {kind === 'matches' && scope && <td>
+                        {managedCompetitionOptions.some((option) => option.value === String(row.competition_id)) && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => editRecord(row)}>Edit fixture</button>}
+                        {isSuperAdmin && <button className="secretary-text-action" type="button" disabled={busy} onClick={() => void deleteFixture(row)}><Trash2 size={14} /> Delete fixture</button>}
+                      </td>}
                     </tr>
                   ))}
                 </tbody>
@@ -876,6 +1033,7 @@ function formatCell(kind: RecordKind, column: string, value: unknown, teams: Rec
   if (column === 'home_team_id') return teams[String(value)] ?? 'Home side'
   if (column === 'away_team_id') return teams[String(value)] ?? 'Away side'
   if (column === 'competition_id') return competitions[String(value)] ?? 'Competition'
+  if (column === 'type' && kind === 'competitions' && value === 'clubfriendly') return 'Club Friendly'
   if (column === 'kickoff_at' || column === 'start_date' || column === 'end_date') return new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(String(value)))
   return String(value).replaceAll('_', ' ')
 }
