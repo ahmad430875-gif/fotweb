@@ -244,7 +244,8 @@
 .public-match-date,.public-live-label{font-size:11px}
 .public-match-teams{gap:5px}
 .public-match-teams strong{font-size:14px;font-weight:600}
-.public-team-crest{width:28px;height:28px;border-color:#d9e3de;border-radius:5px;background:#f3f7f5;color:#2e7d5d;font-size:10px}
+.public-team-crest{width:28px;height:28px;border:0;border-radius:0;background:transparent;color:#2e7d5d;font-size:10px}
+.public-team-crest img{width:100%;height:100%;object-fit:contain}
 .public-match-score strong{font-size:20px}
 .public-match-score span{font-size:11px}
 .public-empty,.public-loading{min-height:100px;gap:8px;border:1px solid #d9e3de;border-radius:7px;background:#fff}
@@ -285,7 +286,8 @@
 .public-detail-hero{display:flex;align-items:center;gap:18px;padding:22px 0 25px;border-bottom:1px solid #d9e3de}
 .public-detail-mark{width:76px;height:76px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;border:0;border-radius:8px;background:transparent;color:#2e7d5d}
 .public-detail-mark img,.public-detail-team-mark img{width:100%;height:100%;object-fit:contain}
-.public-player-photo img,.public-score-team img{width:100%;height:100%;object-fit:cover}
+.public-player-photo img{width:100%;height:100%;object-fit:cover}
+.public-score-team img{width:100%;height:100%;object-fit:contain}
 .public-detail-hero h1,.public-detail-heading h1{margin:5px 0 7px;font:700 34px/1.12 'DM Sans',sans-serif}
 .public-detail-hero p{display:flex;align-items:center;gap:6px;margin:0;color:#5c6b64;font-size:13px}
 .public-detail-section{padding:25px 0;border-bottom:1px solid #d9e3de}
@@ -318,7 +320,7 @@
 .public-match-detail-context>a{font-weight:600}
 .public-match-scoreline{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:20px;padding:23px 0}
 .public-score-team{min-width:0;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center}
-.public-score-team>span{width:58px;height:58px;display:grid;place-items:center;overflow:hidden;border:1px solid #d9e3de;border-radius:7px;background:#f3f7f5;color:#2e7d5d}
+.public-score-team>span{width:58px;height:58px;display:grid;place-items:center;overflow:hidden;border:0;border-radius:0;background:transparent;color:#2e7d5d}
 .public-score-team strong{max-width:100%;overflow-wrap:anywhere;color:#1e2925;font-size:15px}
 .public-score-value{display:grid;grid-template-columns:auto auto auto;align-items:center;gap:9px;text-align:center}
 .public-score-value strong{color:#1e2925;font:700 45px/1 'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}

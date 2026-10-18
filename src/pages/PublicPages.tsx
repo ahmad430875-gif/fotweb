@@ -85,7 +85,7 @@ function usePublicData() {
         supabase.from('competitions').select('id, name, season, type, start_date, end_date, ended_at, venue, format, university_id, description').eq('status', 'published').order('start_date', { ascending: false }),
         supabase.from('universities').select('id, name, short_name, logo_url, location').eq('is_active', true).order('name'),
         supabase.from('teams').select('id, name, short_name, logo_url'),
-        supabase.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, round, venue, published_at').not('published_at', 'is', null).order('kickoff_at', { ascending: false }).limit(12),
+        supabase.from('matches').select('id, competition_id, home_team_id, away_team_id, kickoff_at, status, home_score, away_score, round, venue, published_at').not('published_at', 'is', null).order('kickoff_at', { ascending: true }),
       ])
       if (!active) return
       const failed = competitions.error ?? universities.error ?? teams.error ?? matches.error
@@ -146,7 +146,7 @@ export function PublicHomePage() {
     if (matchFilter === 'results') return match.status === 'full_time'
     return true
   })
-  const featuredMatches = filteredMatches.slice(0, 4)
+  const visibleMatches = filteredMatches
 
   return (
     <PublicFrame>
@@ -188,14 +188,14 @@ export function PublicHomePage() {
             <span className="public-match-sort"><CalendarDays size={14} /> By kickoff time</span>
           </div>
           {data.error && <PublicNotice message="Match data is temporarily unavailable." />}
-          {!data.error && !data.loading && featuredMatches.length === 0 && (
+          {!data.error && !data.loading && visibleMatches.length === 0 && (
             <div className="public-empty">
               <CircleDot size={20} />
               <strong>{matchFilter === 'all' ? 'No published fixtures yet' : `No ${matchFilter} matches`}</strong>
               <span>{matchFilter === 'all' ? 'Match schedules and results will appear here.' : 'Try another match filter.'}</span>
             </div>
           )}
-          {data.loading ? <div className="public-loading">Loading the latest from campus football…</div> : <div className="public-match-list">{featuredMatches.map((match) => <MatchRow key={match.id} match={match} teams={data.teams} competitions={data.competitions} />)}</div>}
+          {data.loading ? <div className="public-loading">Loading the latest from campus football…</div> : <div className="public-match-list">{visibleMatches.map((match) => <MatchRow key={match.id} match={match} teams={data.teams} competitions={data.competitions} />)}</div>}
         </section>
 
         <section className="public-section public-competitions-section">
