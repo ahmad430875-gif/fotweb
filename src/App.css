@@ -218,6 +218,7 @@
 .public-hero h1{font-size:92px;line-height:.95;letter-spacing:0}
 .public-hero-lede{font-size:30px;line-height:1.15}
 .public-hero-copy{font-size:16px;line-height:1.65}
+.login-home-link{width:100%;margin-top:12px}
 .public-hero-stats strong{font-size:29px}
 .public-hero-stats span,.public-inline-link,.public-match-context,.public-match-score span{font-size:12px}
 .public-match-teams strong{font-size:14px}
