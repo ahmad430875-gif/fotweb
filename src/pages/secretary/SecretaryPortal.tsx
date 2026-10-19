@@ -646,7 +646,7 @@ export function SecretaryRecordsPage({ kind }: { kind: RecordKind }) {
       ? await supabase.from(config.table).update(updatePayload as never).eq('id', String(editingRow.id)).eq('university_id', universityId).select('id').single()
       : await supabase.from(config.table).insert(payload as never).select('id').single()
     setBusy(false)
-    if (saveResult.error) { setError(friendlyRecordError(saveResult.error)); return }
+    if (saveResult.error) { setError(friendlyRecordError(saveResult.error, kind)); return }
     form.reset()
     setUrlPreviews({})
     setNotice(editingRow
@@ -1038,7 +1038,7 @@ function formatCell(kind: RecordKind, column: string, value: unknown, teams: Rec
   return String(value).replaceAll('_', ' ')
 }
 
-function friendlyRecordError(error: { code?: string; message: string }) {
+function friendlyRecordError(error: { code?: string; message: string }, kind?: RecordKind) {
   const message = error.message
   const normalizedMessage = message.toLowerCase()
   const diagnostic = `Supabase${error.code ? ` (${error.code})` : ''}: ${message}`
@@ -1050,6 +1050,9 @@ function friendlyRecordError(error: { code?: string; message: string }) {
     return `Some details do not match the required format. Review the form. ${diagnostic}`
   }
   if (error.code === '42501' || normalizedMessage.includes('row-level security') || normalizedMessage.includes('permission denied')) {
+    if (kind === 'competitions') {
+      return `Supabase rejected the competition because its database access policy did not authorize this account. Signing out will not fix a missing or outdated policy. Apply pending migrations to the linked project with npx supabase db push (including 202610190001_university_competition_insert_rls.sql). If that migration is already applied, verify that your user_profiles row is active, has role university_admin, and has the selected university_id, and that the university is active. ${diagnostic}`
+    }
     return `Supabase denied this save. Confirm your account is an active administrator for this university, then sign out and back in to refresh your access. ${diagnostic}`
   }
   if (

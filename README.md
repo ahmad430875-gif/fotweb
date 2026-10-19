@@ -91,6 +91,8 @@ The Tournament Control workspace requires `202610160001_institutional_tournament
 
 Tournament invitations, lifecycle controls, and group qualification also require `202610160002_multi_university_competitions.sql`, `202610170001_competition_lifecycle_and_groups.sql`, and `202610170002_break_team_policy_recursion.sql`. Apply pending migrations in order with `npx supabase db push`. This also repairs a recursive team-registration RLS policy. Then deploy the updated Secretary account-management function with `npx supabase functions deploy manage-secretary`.
 
+University-portal competition creation uses the active `user_profiles` row and active university record as its authorization source. Apply `202610190001_university_competition_insert_rls.sql` with `npx supabase db push` if university administrators receive a row-level security error when creating competitions; the migration refreshes the insert policy without relying on potentially stale Auth metadata. Verify the administrator profile and university are both active if the insert is still denied.
+
 ### Deploy university invitations
 
 The Sports Secretary invitation and password-reset links must return to the app's `/fotweb/` base path. Configure the hosted Edge Function with the public app URL, add that exact URL to Supabase Auth's allowed redirect URLs, then deploy the function:

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowDownRight, ArrowRight, CalendarDays, ChevronDown, ChevronRight, CircleDot, Goal, MapPin, ShieldCheck, SlidersHorizontal, Trophy } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowDownRight, ArrowRight, CalendarDays, ChevronDown, ChevronRight, CircleDot, Goal, MapPin, Search, ShieldCheck, SlidersHorizontal, Trophy, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { FootballLogo } from '../components/FootballLogo'
 import { PwaInstallButton } from '../components/PwaInstallPrompt'
@@ -108,7 +108,149 @@ function usePublicData() {
   return state
 }
 
-export function PublicFrame({ children }: { children: React.ReactNode }) {
+type PublicSearchResult = { id: string; name: string; kind: string; detail: string; path: string }
+
+function PublicHeaderSearch() {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<PublicSearchResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [open])
+
+  useEffect(() => {
+    const term = query.trim()
+    if (!open || term.length < 2) {
+      setResults([])
+      setLoading(false)
+      setError('')
+      return
+    }
+
+    let active = true
+    setResults([])
+    setLoading(true)
+    setError('')
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        if (!supabase) {
+          if (active) {
+            setLoading(false)
+            setError('Search is temporarily unavailable.')
+          }
+          return
+        }
+        const pattern = `%${term}%`
+        const [universities, universityShortNames, teams, teamShortNames, competitions, players] = await Promise.all([
+          supabase.from('universities').select('id, name, short_name').eq('is_active', true).ilike('name', pattern).limit(5),
+          supabase.from('universities').select('id, name, short_name').eq('is_active', true).ilike('short_name', pattern).limit(5),
+          supabase.from('teams').select('id, name, short_name').ilike('name', pattern).limit(5),
+          supabase.from('teams').select('id, name, short_name').ilike('short_name', pattern).limit(5),
+          supabase.from('competitions').select('id, name, season, format').eq('status', 'published').ilike('name', pattern).limit(5),
+          supabase.from('public_player_profiles').select('id, full_name, position, academic_program').ilike('full_name', pattern).limit(5),
+        ])
+        if (!active) return
+        const failed = [universities, universityShortNames, teams, teamShortNames, competitions, players].find((result) => result.error)
+        if (failed?.error) {
+          setLoading(false)
+          setError('Search is temporarily unavailable.')
+          return
+        }
+
+        const uniqueRows = <T extends { id: string }>(rows: T[]) => [...new Map(rows.map((row) => [row.id, row])).values()]
+        setResults([
+          ...uniqueRows([...(universities.data ?? []), ...(universityShortNames.data ?? [])]).map((row) => ({
+            id: row.id,
+            name: row.name,
+            kind: 'University',
+            detail: row.short_name,
+            path: `/universities/${row.id}`,
+          })),
+          ...uniqueRows([...(teams.data ?? []), ...(teamShortNames.data ?? [])]).map((row) => ({
+            id: row.id,
+            name: row.name,
+            kind: 'Team',
+            detail: row.short_name,
+            path: `/teams/${row.id}`,
+          })),
+          ...(competitions.data ?? []).map((row) => ({
+            id: row.id,
+            name: row.name,
+            kind: row.format === 'league' ? 'League' : 'Competition',
+            detail: row.season,
+            path: `/competitions/${row.id}`,
+          })),
+          ...(players.data ?? []).map((row) => ({
+            id: row.id,
+            name: row.full_name,
+            kind: 'Player',
+            detail: [row.position, row.academic_program].filter(Boolean).join(' · '),
+            path: `/players/${row.id}`,
+          })),
+        ])
+        setLoading(false)
+      })()
+    }, 250)
+
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [open, query])
+
+  return <div className="public-header-search" ref={rootRef}>
+    <button
+      className="public-search-toggle"
+      type="button"
+      aria-label={open ? 'Close search' : 'Search FOTWEB'}
+      aria-expanded={open}
+      aria-controls="public-header-search-panel"
+      onClick={() => setOpen((current) => !current)}
+    >
+      {open ? <X size={18} /> : <Search size={18} />}
+    </button>
+    {open && <div className="public-header-search-panel" id="public-header-search-panel" role="region" aria-label="Search profiles">
+      <label className="public-header-search-field">
+        <Search size={16} aria-hidden="true" />
+        <span className="sr-only">Search universities, teams, competitions, and players</span>
+        <input
+          ref={inputRef}
+          type="search"
+          value={query}
+          placeholder="Search FOTWEB"
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}
+        />
+      </label>
+      {loading && <p className="public-search-status">Searching…</p>}
+      {error && <p className="public-search-status" role="status">{error}</p>}
+      {!loading && !error && query.trim().length >= 2 && results.length === 0 && <p className="public-search-status">No matching profiles.</p>}
+      {results.length > 0 && <div className="public-search-results">
+        {results.map((result) => <Link className="public-search-result" to={result.path} key={`${result.kind}-${result.id}`} onClick={() => setOpen(false)}>
+          <span className="public-search-result-copy"><strong>{result.name}</strong><small>{result.detail || result.kind}</small></span>
+          <span className="public-search-result-kind">{result.kind}</span>
+          <ArrowRight size={15} aria-hidden="true" />
+        </Link>)}
+      </div>}
+    </div>}
+  </div>
+}
+
+export function PublicFrame({ children, showSearch = false }: { children: React.ReactNode; showSearch?: boolean }) {
   return (
     <div className="public-site">
       <header className="public-header">
@@ -120,6 +262,7 @@ export function PublicFrame({ children }: { children: React.ReactNode }) {
           <Link to="/competitions">Competitions</Link>
           <Link to="/universities">Universities</Link>
         </nav>
+        {showSearch && <PublicHeaderSearch />}
         <Link className="public-admin-link" to="/admin/login">
           <ShieldCheck size={15} />
           <span>Admin sign in</span>
@@ -167,7 +310,7 @@ export function PublicHomePage() {
   }
 
   return (
-    <PublicFrame>
+    <PublicFrame showSearch>
       <main>
         <section className="public-hero">
           <img className="public-hero-image" src="https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=2400&q=85" alt="Floodlit football stadium ready for a match" />
